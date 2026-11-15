@@ -3,80 +3,111 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>تحلیل کل بورس (۷۰۰+ نماد) و کل کریپتو</title>
+  <title>چارت کندل‌استیک حرفه‌ای | بورس و کریپتو</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://unpkg.com/lightweight-charts@4.2.1/dist/lightweight-charts.standalone.production.js"></script>
   <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet" />
-  <style>body{font-family:'Vazirmatn',sans-serif;background:#090e1a;color:#e2e8f0}.card{background:#111827;border:1px solid #1f2937;border-radius:14px}</style>
+  <style>
+    body{font-family:'Vazirmatn',sans-serif;background:#090e1a;color:#e2e8f0}
+    .card{background:#111827;border:1px solid #1f2937;border-radius:14px}
+    .ind-btn{transition:all .15s;border:1px solid #334155}
+    .ind-on{background:#059669;border-color:#10b981;color:#fff;font-weight:bold}
+    .ind-off{background:#1e293b;color:#94a3b8}
+  </style>
 </head>
 <body class="p-3 md:p-6 max-w-7xl mx-auto space-y-5">
 
   <header class="card p-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
     <div>
-      <h1 class="text-xl font-bold text-emerald-400">سامانه جامع بورس و کریپتو</h1>
-      <p class="text-xs text-slate-400">جست‌وجوی فارسی و انگلیسی | ۴ بازه: روزانه، هفتگی، ماهانه، ۱۲۰ روزه</p>
+      <h1 class="text-xl font-bold text-emerald-400">ترمینال تحلیل تکنیکال کندل‌استیک و بنیادی</h1>
+      <p class="text-xs text-slate-400">چارت واقعی TradingView | پرایس اکشن، فیبوناچی، RSI، MACD، EMA، بولینگر</p>
     </div>
-    <div id="sys-badge" class="text-[11px] bg-slate-800 px-3 py-1.5 rounded-lg text-sky-300">در حال بررسی اتصال...</div>
+    <div id="sys-badge" class="text-[11px] bg-slate-800 px-3 py-1.5 rounded-lg text-sky-300">در حال اتصال...</div>
   </header>
 
-  <!-- کادر اتصال مستقیم کلید رایگان بورس -->
-  <div id="bourse-alert" class="hidden bg-amber-950/60 border border-amber-700/60 text-amber-100 text-xs p-4 rounded-xl space-y-2">
+  <div id="bourse-alert" class="hidden bg-amber-950/60 border border-amber-700/60 text-amber-100 text-xs p-3 rounded-xl space-y-2">
     <div id="bourse-alert-text" class="leading-6"></div>
     <div class="flex flex-wrap gap-2">
-      <input id="brs-key-input" type="text" placeholder="کلید رایگان سایت brsapi.ir را اینجا پیست کنید..." class="bg-slate-900 border border-amber-700 rounded-lg px-3 py-1.5 text-xs flex-1 min-w-[200px]" />
-      <button onclick="saveBrsKey()" class="bg-amber-600 hover:bg-amber-500 px-4 py-1.5 rounded-lg font-bold text-xs">ذخیره و اتصال ۷۰۰+ نماد بورس</button>
+      <input id="brs-key-input" type="text" placeholder="کلید brsapi.ir را اینجا بگذارید..." class="bg-slate-900 border border-amber-700 rounded-lg px-3 py-1.5 text-xs flex-1 min-w-[200px]" />
+      <button onclick="saveBrsKey()" class="bg-amber-600 px-4 py-1.5 rounded-lg font-bold text-xs">اتصال بورس</button>
     </div>
   </div>
 
-  <section class="card p-4 md:p-5 space-y-4">
-    <h2 class="text-base font-bold text-amber-400">جست‌وجوی فوری (فارسی یا انگلیسی بنویسید: بیت کوین، سولانا، فولاد، اهرم، عیار، BTC...)</h2>
+  <!-- جست‌وجو و چارت کندل‌استیک حرفه‌ای -->
+  <section class="card p-3 md:p-5 space-y-4">
     <div class="relative">
       <div class="flex flex-wrap gap-2">
-        <input id="search-box" type="text" oninput="liveSearch()" placeholder="مثلاً: بیت کوین / پپه / فولاد / عیار / BTC" class="bg-slate-900 border border-slate-700 rounded-lg px-4 py-2.5 text-sm flex-1 min-w-[220px]" value="بیت کوین" />
+        <input id="search-box" type="text" oninput="liveSearch()" placeholder="نام فارسی یا انگلیسی نماد (بیت کوین، سولانا، BTC، فولاد...)" class="bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-sm flex-1 min-w-[210px]" value="BTC" />
         <select id="mkt-select" class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm">
-          <option value="AUTO">همه بازارها (خودکار)</option>
-          <option value="BOURSE">فقط بورس و صندوق</option>
-          <option value="CRYPTO">فقط کریپتو</option>
+          <option value="AUTO">همه بازارها</option>
+          <option value="CRYPTO">کریپتو</option>
+          <option value="BOURSE">بورس</option>
         </select>
-        <button onclick="runAnalyze()" class="bg-emerald-600 hover:bg-emerald-500 px-5 py-2 rounded-lg text-sm font-bold">تحلیل فوری</button>
+        <button onclick="runAnalyze()" class="bg-emerald-600 hover:bg-emerald-500 px-5 py-2 rounded-lg text-sm font-bold">نمایش چارت</button>
       </div>
       <div id="autocomplete-list" class="hidden absolute z-30 w-full bg-slate-900 border border-slate-700 rounded-lg mt-1 max-h-60 overflow-y-auto shadow-2xl"></div>
     </div>
 
     <div id="analysis-area" class="space-y-4 hidden">
-      <div id="speed-bar" class="text-xs bg-slate-900/90 border border-slate-800 px-3 py-2 rounded-lg flex flex-wrap justify-between gap-2"></div>
+      <div id="speed-bar" class="text-xs bg-slate-900 border border-slate-800 px-3 py-2 rounded-lg flex flex-wrap justify-between gap-2"></div>
+
+      <!-- نوار ابزار روشن/خاموش کردن تکی یا همگانی اندیکاتورها -->
+      <div class="bg-slate-900/90 border border-slate-800 p-2.5 rounded-xl flex flex-wrap items-center gap-2 text-xs">
+        <span class="text-slate-400 font-bold ml-1">اندیکاتورهای چارت:</span>
+        <button onclick="toggleInd('pa')" id="btn-pa" class="ind-btn ind-on px-3 py-1 rounded-lg">پرایس اکشن (الگو + حمایت/مقاومت)</button>
+        <button onclick="toggleInd('fib')" id="btn-fib" class="ind-btn ind-on px-3 py-1 rounded-lg">فیبوناچی</button>
+        <button onclick="toggleInd('ema')" id="btn-ema" class="ind-btn ind-off px-3 py-1 rounded-lg">EMA 20 / 50</button>
+        <button onclick="toggleInd('bb')" id="btn-bb" class="ind-btn ind-off px-3 py-1 rounded-lg">بولینگر</button>
+        <button onclick="toggleInd('vol')" id="btn-vol" class="ind-btn ind-on px-3 py-1 rounded-lg">حجم</button>
+        <button onclick="toggleInd('rsi')" id="btn-rsi" class="ind-btn ind-on px-3 py-1 rounded-lg">RSI (14)</button>
+        <button onclick="toggleInd('macd')" id="btn-macd" class="ind-btn ind-on px-3 py-1 rounded-lg">MACD</button>
+        <span class="flex-1"></span>
+        <button onclick="setAllInd(true)" class="bg-sky-700 hover:bg-sky-600 px-3 py-1 rounded-lg font-bold">همه روشن</button>
+        <button onclick="setAllInd(false)" class="bg-slate-700 hover:bg-slate-600 px-3 py-1 rounded-lg">فقط کندل</button>
+      </div>
+
+      <!-- کانتینر چارت اصلی کندل‌استیک -->
+      <div class="bg-[#0b1220] border border-slate-800 rounded-xl p-2 space-y-1">
+        <div id="ohlc-legend" class="text-[11px] font-mono text-slate-300 px-2 py-1 flex flex-wrap gap-3" dir="ltr"></div>
+        <div id="main-chart-box" class="w-full" style="height: 360px;"></div>
+        <div id="rsi-wrap" class="border-t border-slate-800/80 pt-1">
+          <div class="text-[10px] text-purple-300 px-2" id="rsi-label">RSI (14)</div>
+          <div id="rsi-chart-box" class="w-full" style="height: 120px;"></div>
+        </div>
+        <div id="macd-wrap" class="border-t border-slate-800/80 pt-1">
+          <div class="text-[10px] text-sky-300 px-2">MACD (12, 26, 9)</div>
+          <div id="macd-chart-box" class="w-full" style="height: 130px;"></div>
+        </div>
+      </div>
+
+      <!-- ۴ بازه زمانی: روزانه، هفتگی، ماهانه، ۱۲۰ روزه -->
       <div id="horizons-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3"></div>
 
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-3">
-        <div class="bg-slate-900 p-3 rounded-xl border border-slate-800 lg:col-span-2">
-          <div class="text-xs text-slate-400 mb-1">نمودار قیمت + فیبوناچی</div>
-          <canvas id="priceChart" height="140"></canvas>
+      <!-- بنیادی، روانشناس، استراتژی گذشته/حال/آینده -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+        <div class="bg-slate-900 p-3 rounded-xl border border-emerald-900/50 space-y-1">
+          <b class="text-emerald-400">تحلیلگر بنیادی و نقدینگی</b>
+          <div id="fund-info" class="text-slate-300 leading-6"></div>
         </div>
-        <div class="bg-slate-900 p-3 rounded-xl border border-slate-800 space-y-2 text-xs">
-          <div class="font-bold text-sky-400">پرایس اکشن، بنیادی و روانشناسی</div>
-          <div id="pa-info" class="leading-6"></div>
-          <div id="fund-info" class="pt-2 border-t border-slate-800 text-emerald-300 leading-6"></div>
-          <div id="psych-info" class="pt-2 border-t border-slate-800 text-purple-300 leading-6"></div>
+        <div class="bg-slate-900 p-3 rounded-xl border border-purple-900/50 space-y-1">
+          <b class="text-purple-400">روانشناس بازار</b>
+          <div id="psych-info" class="text-slate-300 leading-6"></div>
         </div>
-      </div>
-
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-        <div class="bg-slate-900 p-3 rounded-xl border border-slate-800"><div class="text-xs text-slate-400 mb-1">RSI (14)</div><canvas id="rsiChart" height="90"></canvas></div>
-        <div class="bg-slate-900 p-3 rounded-xl border border-slate-800"><div class="text-xs text-slate-400 mb-1">MACD</div><canvas id="macdChart" height="90"></canvas></div>
-      </div>
-
-      <div class="bg-slate-900 p-3 rounded-xl border border-amber-900/40 text-xs space-y-1.5">
-        <div class="font-bold text-amber-400">استراتژی گذشته، حال و آینده:</div>
-        <div id="st-past"></div><div id="st-present" class="text-emerald-300"></div><div id="st-future" class="text-sky-300"></div>
+        <div class="bg-slate-900 p-3 rounded-xl border border-amber-900/50 space-y-1">
+          <b class="text-amber-400">استراتژی گذشته، حال و آینده</b>
+          <div id="strat-info" class="text-slate-300 leading-6 space-y-1"></div>
+        </div>
       </div>
     </div>
   </section>
 
+  <!-- ۵ فرصت برتر -->
   <section class="card p-4 space-y-3">
     <h2 class="text-base font-bold text-sky-400">۵ فرصت برتر در ۴ بازه (روزانه تا ۱۲۰ روزه)</h2>
     <div id="top5-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3"></div>
   </section>
 
+  <!-- پرتفوی شخصی -->
   <section class="card p-4 space-y-3">
     <h2 class="text-base font-bold text-purple-400">پرتفوی شخصی</h2>
     <div class="grid grid-cols-1 sm:grid-cols-5 gap-2">
@@ -89,6 +120,7 @@
     <div class="overflow-x-auto"><table class="w-full text-xs text-right"><thead class="text-slate-400 border-b border-slate-800"><tr><th class="py-2">نماد</th><th>بازار</th><th>تعداد</th><th>خرید</th><th>فعلی</th><th>سود/زیان</th><th>وضعیت</th><th>حذف</th></tr></thead><tbody id="pf-body"></tbody></table></div>
   </section>
 
+  <!-- مقایسه امروز و دیروز -->
   <section class="card p-4 space-y-3">
     <h2 class="text-base font-bold text-emerald-400">مقایسه قیمت امروز و دیروز</h2>
     <div class="flex flex-wrap gap-2">
@@ -101,27 +133,170 @@
     <div class="overflow-x-auto"><table class="w-full text-xs text-right"><thead class="text-slate-400 border-b border-slate-800"><tr><th class="py-2">#</th><th>نماد</th><th>دیروز</th><th>امروز</th><th>تغییر</th></tr></thead><tbody id="wl-body"></tbody></table></div>
   </section>
 
+  <footer class="text-center text-[11px] text-slate-500 pb-4">
+    نمودارهای تعاملی با کتابخانه <a href="https://www.tradingview.com" target="_blank" class="text-sky-400 underline">TradingView Lightweight Charts™</a>
+  </footer>
+
 <script>
-let wl = {}, curTab = 'crypto', pC = null, rC = null, mC = null, searchTimer = null;
+let wl = {}, curTab = 'crypto', searchTimer = null, lastPayload = null;
+let mainChart = null, rsiChart = null, macdChart = null;
+let candleSeries = null, volSeries = null, ema20S = null, ema50S = null, bbUpS = null, bbLoS = null;
+let priceLines = [];
+const indState = { pa: true, fib: true, ema: false, bb: false, vol: true, rsi: true, macd: true };
+
 const fmt = n => (n === null || n === undefined) ? '-' : Number(n).toLocaleString('fa-IR', {maximumFractionDigits: 6});
 const getBrs = () => localStorage.getItem('BRSAPI_KEY') || '';
 
-function saveBrsKey() {
-  localStorage.setItem('BRSAPI_KEY', document.getElementById('brs-key-input').value.trim());
-  loadSys(); loadWL();
+function saveBrsKey() { localStorage.setItem('BRSAPI_KEY', document.getElementById('brs-key-input').value.trim()); loadSys(); loadWL(); }
+
+function toggleInd(k) {
+  indState[k] = !indState[k];
+  updateIndButtons();
+  if (lastPayload) renderTradingCharts(lastPayload.chart);
 }
+function setAllInd(on) {
+  Object.keys(indState).forEach(k => indState[k] = on);
+  updateIndButtons();
+  if (lastPayload) renderTradingCharts(lastPayload.chart);
+}
+function updateIndButtons() {
+  Object.keys(indState).forEach(k => {
+    const b = document.getElementById('btn-' + k);
+    if (b) b.className = `ind-btn ${indState[k] ? 'ind-on' : 'ind-off'} px-3 py-1 rounded-lg`;
+  });
+}
+
+function chartBaseOpts(height, hideTime = false) {
+  return {
+    height,
+    layout: { background: { type: 'solid', color: '#0b1220' }, textColor: '#94a3b8' },
+    grid: { vertLines: { color: '#1e293b' }, horzLines: { color: '#1e293b' } },
+    crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+    rightPriceScale: { borderColor: '#334155' },
+    timeScale: { borderColor: '#334155', visible: !hideTime, timeVisible: false },
+  };
+}
+
+function clearCharts() {
+  if (mainChart) { mainChart.remove(); mainChart = null; }
+  if (rsiChart) { rsiChart.remove(); rsiChart = null; }
+  if (macdChart) { macdChart.remove(); macdChart = null; }
+  priceLines = [];
+}
+
+function renderTradingCharts(ch) {
+  clearCharts();
+  const mainEl = document.getElementById('main-chart-box');
+  mainChart = LightweightCharts.createChart(mainEl, { ...chartBaseOpts(360, indState.rsi || indState.macd), width: mainEl.clientWidth });
+
+  // ۱) کندل‌استیک اصلی سبز مثبت / قرمز منفی
+  candleSeries = mainChart.addCandlestickSeries({
+    upColor: '#10b981', downColor: '#ef4444',
+    borderUpColor: '#10b981', borderDownColor: '#ef4444',
+    wickUpColor: '#10b981', wickDownColor: '#ef4444',
+  });
+  candleSeries.setData(ch.candles);
+
+  // نمایش OHLC زیر انگشت کاربر
+  const lastC = ch.candles[ch.candles.length - 1];
+  const showOHLC = c => {
+    if (!c) return;
+    const col = c.close >= c.open ? 'text-emerald-400' : 'text-rose-400';
+    document.getElementById('ohlc-legend').innerHTML = `<span>O: <b>${c.open}</b></span><span>H: <b>${c.high}</b></span><span>L: <b>${c.low}</b></span><span class="${col}">C: <b>${c.close}</b></span>`;
+  };
+  showOHLC(lastC);
+  mainChart.subscribeCrosshairMove(p => { if (p && p.seriesData) { const d = p.seriesData.get(candleSeries); if (d) showOHLC(d); } });
+
+  // ۲) حجم معاملات
+  if (indState.vol) {
+    volSeries = mainChart.addHistogramSeries({ priceFormat: { type: 'volume' }, priceScaleId: 'vol' });
+    mainChart.priceScale('vol').applyOptions({ scaleMargins: { top: 0.82, bottom: 0 } });
+    volSeries.setData(ch.volume);
+  }
+
+  // ۳) میانگین متحرک EMA 20 & 50
+  if (indState.ema) {
+    ema20S = mainChart.addLineSeries({ color: '#38bdf8', lineWidth: 2, title: 'EMA20' });
+    ema20S.setData(ch.ema20);
+    ema50S = mainChart.addLineSeries({ color: '#f59e0b', lineWidth: 2, title: 'EMA50' });
+    ema50S.setData(ch.ema50);
+  }
+
+  // ۴) باند بولینگر
+  if (indState.bb) {
+    bbUpS = mainChart.addLineSeries({ color: 'rgba(168,85,247,0.7)', lineWidth: 1, lineStyle: 2, title: 'BB+' });
+    bbLoS = mainChart.addLineSeries({ color: 'rgba(168,85,247,0.7)', lineWidth: 1, lineStyle: 2, title: 'BB-' });
+    bbUpS.setData(ch.bb_upper);
+    bbLoS.setData(ch.bb_lower);
+  }
+
+  // ۵) پرایس اکشن: مارکرهای کندلی + خطوط افقی حمایت و مقاومت
+  if (indState.pa) {
+    candleSeries.setMarkers(ch.pa_markers);
+    candleSeries.createPriceLine({ price: ch.pa_support, color: '#10b981', lineWidth: 2, lineStyle: 0, axisLabelVisible: true, title: 'حمایت PA' });
+    candleSeries.createPriceLine({ price: ch.pa_resistance, color: '#ef4444', lineWidth: 2, lineStyle: 0, axisLabelVisible: true, title: 'مقاومت PA' });
+  }
+
+  // ۶) فیبوناچی اصلاحی روی کندل‌ها
+  if (indState.fib) {
+    const fibColors = { '0.0 (سقف)': '#ef4444', '0.236': '#fb923c', '0.382': '#facc15', '0.500': '#38bdf8', '0.618 (طلایی)': '#10b981', '1.0 (کف)': '#94a3b8' };
+    Object.entries(ch.fib).forEach(([lbl, val]) => {
+      candleSeries.createPriceLine({ price: val, color: fibColors[lbl] || '#cbd5e1', lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: `Fib ${lbl}` });
+    });
+  }
+
+  // ۷) پنل هم‌زمان RSI
+  const rsiWrap = document.getElementById('rsi-wrap');
+  if (indState.rsi) {
+    rsiWrap.classList.remove('hidden');
+    document.getElementById('rsi-label').innerText = `RSI (14) — مقدار فعلی: ${ch.rsi_now}`;
+    const rEl = document.getElementById('rsi-chart-box');
+    rsiChart = LightweightCharts.createChart(rEl, { ...chartBaseOpts(120, indState.macd), width: rEl.clientWidth });
+    const rs = rsiChart.addLineSeries({ color: '#a78bfa', lineWidth: 2 });
+    rs.setData(ch.rsi);
+    rs.createPriceLine({ price: 70, color: '#ef4444', lineWidth: 1, lineStyle: 2, title: 'اشباع خرید 70' });
+    rs.createPriceLine({ price: 30, color: '#10b981', lineWidth: 1, lineStyle: 2, title: 'اشباع فروش 30' });
+  } else {
+    rsiWrap.classList.add('hidden');
+  }
+
+  // ۸) پنل هم‌زمان MACD
+  const macdWrap = document.getElementById('macd-wrap');
+  if (indState.macd) {
+    macdWrap.classList.remove('hidden');
+    const mEl = document.getElementById('macd-chart-box');
+    macdChart = LightweightCharts.createChart(mEl, { ...chartBaseOpts(130, false), width: mEl.clientWidth });
+    macdChart.addHistogramSeries().setData(ch.macd_hist);
+    macdChart.addLineSeries({ color: '#38bdf8', lineWidth: 2 }).setData(ch.macd);
+    macdChart.addLineSeries({ color: '#fb923c', lineWidth: 1.5 }).setData(ch.macd_signal);
+  } else {
+    macdWrap.classList.add('hidden');
+  }
+
+  // همگام‌سازی زوم و حرکت هر ۳ چارت با انگشت
+  const charts = [mainChart, rsiChart, macdChart].filter(Boolean);
+  charts.forEach(c => {
+    c.timeScale().subscribeVisibleLogicalRangeChange(range => {
+      if (!range) return;
+      charts.forEach(other => { if (other !== c) other.timeScale().setVisibleLogicalRange(range); });
+    });
+  });
+  mainChart.timeScale().fitContent();
+}
+
+window.addEventListener('resize', () => {
+  if (lastPayload) renderTradingCharts(lastPayload.chart);
+});
 
 async function loadSys() {
   const s = await (await fetch(`/api/system-status?brs_key=${encodeURIComponent(getBrs())}`)).json();
-  document.getElementById('sys-badge').innerText = `کریپتو: ${s.crypto_count} رمزارز | بورس: ${s.bourse_count} نماد (${s.bourse_source})`;
+  document.getElementById('sys-badge').innerText = `کریپتو: ${s.crypto_count} رمزارز | بورس: ${s.bourse_count} نماد`;
   const ab = document.getElementById('bourse-alert');
   if (s.bourse_count < 50) {
     ab.classList.remove('hidden');
     document.getElementById('brs-key-input').value = getBrs();
-    document.getElementById('bourse-alert-text').innerHTML = `⚠️ <b>وضعیت بورس (${s.bourse_source}):</b> سرور بورس تهران از آی‌پی آمریکای Vercel پاسخ نمی‌دهد. از سایت رایگان <b>brsapi.ir</b> یک API Key بگیرید و همین‌جا وارد کنید تا همه ۷۰۰+ نماد بورس، فرابورس و صندوق‌ها فعال شوند:`;
-  } else {
-    ab.classList.add('hidden');
-  }
+    document.getElementById('bourse-alert-text').innerText = `بورس (${s.bourse_source}) برای ۷۰۰+ نماد نیاز به کلید رایگان brsapi.ir دارد:`;
+  } else { ab.classList.add('hidden'); }
 }
 
 async function liveSearch() {
@@ -135,7 +310,7 @@ async function liveSearch() {
     list.innerHTML = d.results.map(r => `
       <div onclick="pickSymbol('${r.symbol}','${r.market}')" class="px-3 py-2 hover:bg-slate-800 cursor-pointer flex justify-between text-xs border-b border-slate-800/50">
         <span><b>${r.symbol}</b> <span class="text-slate-400">${r.name}</span></span>
-        <span class="text-emerald-400">${fmt(r.today)} ${r.unit} (${r.market === 'CRYPTO' ? 'کریپتو' : 'بورس'})</span>
+        <span class="text-emerald-400">${fmt(r.today)} ${r.unit}</span>
       </div>`).join('');
     list.classList.remove('hidden');
   }, 100);
@@ -156,16 +331,15 @@ async function runAnalyze() {
   const area = document.getElementById('analysis-area');
   area.classList.remove('hidden');
 
-  if (!d.found) {
-    document.getElementById('speed-bar').innerHTML = `<span class="text-rose-400">نماد «${sym}» پیدا نشد (${d.elapsed_ms}ms) | وضعیت بورس: ${d.bourse_source}</span>`;
-    return;
-  }
-  if (d.no_candles) {
-    document.getElementById('speed-bar').innerHTML = `<span class="text-amber-300">نماد ${d.symbol} پیدا شد ولی تاریخچه ۱۸۰ روزه برنگشت. جزئیات خطا: ${d.candle_source}</span>`;
+  if (!d.found || d.no_candles) {
+    document.getElementById('speed-bar').innerHTML = `<span class="text-rose-400">${d.found ? d.candle_source : 'نماد یافت نشد'}</span>`;
     return;
   }
 
-  document.getElementById('speed-bar').innerHTML = `<span>نماد: <b>${d.symbol} (${d.display_name})</b> | قیمت: <b>${fmt(d.price)} ${d.unit}</b> | منبع: ${d.candle_source} (${d.bars_count} کندل)</span><span class="text-emerald-400">سرعت: ${d.elapsed_ms} میلی‌ثانیه</span>`;
+  lastPayload = d;
+  document.getElementById('speed-bar').innerHTML = `<span>نماد: <b>${d.symbol} (${d.display_name})</b> | قیمت: <b>${fmt(d.price)} ${d.unit}</b> | ${d.bars_count} کندل</span><span class="text-emerald-400">${d.elapsed_ms} میلی‌ثانیه</span>`;
+  renderTradingCharts(d.chart);
+
   document.getElementById('horizons-grid').innerHTML = Object.values(d.contracts).map(h => {
     if (!h.evaluatable) return `<div class="bg-slate-900 border border-rose-900/50 p-3 rounded-xl text-xs"><b class="text-rose-400">${h.label}</b><div class="mt-1 text-rose-300">قابل ارزیابی نیست (${h.available_bars}/${h.required_min_bars})</div></div>`;
     return `<div class="bg-slate-900 border border-slate-800 p-3 rounded-xl text-xs space-y-1">
@@ -177,26 +351,9 @@ async function runAnalyze() {
     </div>`;
   }).join('');
 
-  const t = d.technical;
-  document.getElementById('pa-info').innerHTML = `<div><b>ساختار:</b> ${t.structure}</div><div><b>حمایت ۰.۶۱۸:</b> ${fmt(t.fib['0.618'])} | <b>مقاومت ۰.۲۳۶:</b> ${fmt(t.fib['0.236'])}</div>`;
-  document.getElementById('fund-info').innerText = `بنیادی/نقدشوندگی: ${d.fundamental}`;
-  document.getElementById('psych-info').innerText = `روانشناس: ${d.psychology.mood} — ${d.psychology.advice}`;
-  document.getElementById('st-past').innerText = '🔹 ' + d.strategies.past;
-  document.getElementById('st-present').innerText = '🔸 ' + d.strategies.present;
-  document.getElementById('st-future').innerText = '🔺 ' + d.strategies.future;
-
-  if (pC) pC.destroy(); if (rC) rC.destroy(); if (mC) mC.destroy();
-  pC = new Chart(document.getElementById('priceChart'), {
-    type: 'line',
-    data: { labels: t.dates, datasets: [
-      {label:'قیمت', data:t.closes, borderColor:'#34d399', pointRadius:0},
-      {label:'فیبو 0.236', data:Array(t.dates.length).fill(t.fib['0.236']), borderColor:'#f87171', borderDash:[4,4], pointRadius:0},
-      {label:'فیبو 0.618', data:Array(t.dates.length).fill(t.fib['0.618']), borderColor:'#fbbf24', borderDash:[4,4], pointRadius:0}
-    ]},
-    options: {plugins:{legend:{labels:{color:'#cbd5e1',font:{size:10}}}}, scales:{x:{ticks:{color:'#64748b'}},y:{ticks:{color:'#64748b'}}}}
-  });
-  rC = new Chart(document.getElementById('rsiChart'), {type:'line', data:{labels:t.dates, datasets:[{data:t.rsi_series, borderColor:'#a78bfa', pointRadius:0}]}, options:{plugins:{legend:{display:false}}, scales:{y:{min:0,max:100}, x:{ticks:{display:false}}}}});
-  mC = new Chart(document.getElementById('macdChart'), {data:{labels:t.dates, datasets:[{type:'line',label:'MACD',data:t.macd_series,borderColor:'#38bdf8',pointRadius:0},{type:'line',label:'Sig',data:t.signal_series,borderColor:'#fb923c',pointRadius:0},{type:'bar',label:'Hist',data:t.hist_series,backgroundColor:'#4ade80'}]}, options:{plugins:{legend:{labels:{color:'#cbd5e1',font:{size:10}}}}, scales:{x:{ticks:{display:false}}}}});
+  document.getElementById('fund-info').innerText = d.fundamental;
+  document.getElementById('psych-info').innerText = `${d.psychology.mood} — ${d.psychology.advice}`;
+  document.getElementById('strat-info').innerHTML = `<div>🔹 ${d.strategies.past}</div><div class="text-emerald-300">🔸 ${d.strategies.present}</div><div class="text-sky-300">🔺 ${d.strategies.future}</div>`;
 }
 
 async function loadTop5() {
@@ -205,7 +362,7 @@ async function loadTop5() {
   document.getElementById('top5-grid').innerHTML = Object.keys(names).map(k => `
     <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 space-y-1.5 text-xs">
       <div class="font-bold text-sky-400 border-b border-slate-800 pb-1">۵ برتر ${names[k]}</div>
-      ${(d[k]||[]).map((x,i) => `<div onclick="pickSymbol('${x.symbol}','CRYPTO')" class="flex justify-between cursor-pointer hover:text-emerald-300"><span>${i+1}. <b>${x.symbol}</b></span><span class="text-emerald-400">+${x.net_return_pct}%</span></div>`).join('') || '<div class="text-slate-500">در حال بررسی...</div>'}
+      ${(d[k]||[]).map((x,i) => `<div onclick="pickSymbol('${x.symbol}','CRYPTO')" class="flex justify-between cursor-pointer hover:text-emerald-300"><span>${i+1}. <b>${x.symbol}</b></span><span class="text-emerald-400">+${x.net_return_pct}%</span></div>`).join('') || '-'}
     </div>`).join('');
 }
 
