@@ -29,7 +29,7 @@ BRSAPI_HEADERS = {
     "Accept": "application/json, text/plain, */*",
 }
 
-app = FastAPI(title="نسخه اصلاح‌شده - باطن دقیق و تست‌پذیر")
+app = FastAPI(title="نسخه اصلاح‌شده - رفع باگ تتر و کش سرعت")
 
 def norm_fa(text: str) -> str:
     if not text:
@@ -57,7 +57,6 @@ def _unwrap_list(payload) -> list:
                 return payload[k]
     return []
 
-# تبدیل دقیق تاریخ شمسی به میلادی (بدون جعل تاریخ)
 def jalali_to_gregorian(jy: int, jm: int, jd: int) -> Tuple[int, int, int]:
     jy += 1595
     days = -355668 + (365 * jy) + ((jy // 33) * 8) + (((jy % 33) + 3) // 4) + jd
@@ -85,13 +84,11 @@ def jalali_to_gregorian(jy: int, jm: int, jd: int) -> Tuple[int, int, int]:
     return gy, gm, gd
 
 def parse_candle_timestamp(raw_date) -> Optional[int]:
-    """تبدیل تاریخ واقعی (میلادی یا شمسی) به تایم‌استمپ دقیق. در نبود تاریخ معتبر None برمی‌گرداند."""
     if raw_date is None:
         return None
     s = str(raw_date).strip()
     if not s:
         return None
-    # فرمت عددی میلادی YYYYMMDD مثل 20261115
     if len(s) == 8 and s.isdigit():
         y = int(s[:4])
         if 1990 <= y <= 2100:
@@ -99,7 +96,6 @@ def parse_candle_timestamp(raw_date) -> Optional[int]:
         if 1350 <= y <= 1500:
             gy, gm, gd = jalali_to_gregorian(y, int(s[4:6]), int(s[6:8]))
             return int(datetime(gy, gm, gd, 12, 0, tzinfo=TEHRAN_TZ).timestamp())
-    # فرمت YYYY-MM-DD یا YYYY/MM/DD
     clean = s[:10].replace("/", "-")
     parts = clean.split("-")
     if len(parts) == 3 and all(p.isdigit() for p in parts):
@@ -165,14 +161,13 @@ HORIZON_SPECS = {
 
 CRYPTO_CACHE: Dict[str, Any] = {"ts": 0, "items": [], "source": "NOT_LOADED"}
 BOURSE_CACHE: Dict[str, Any] = {"ts": 0, "items": [], "source": "NOT_LOADED", "key_used": ""}
-MACRO_CACHE: Dict[str, Any] = {"ts": 0, "usdt_toman": None, "usdt_source": "NOT_LOADED", "fx_rates": {}, "fx_source": "NOT_LOADED", "fng": None}
+MACRO_CACHE: Dict[str, Any] = {"ts": 0, "usdt_toman": None, "usdt_source": "NOT_LOADED", "fx_rates": {}, "fx_source": "NOT_LOADED", "fng": None, "key_used": ""}
 CANDLE_CACHE: Dict[str, Dict[str, Any]] = {}
 
 def enrich_comparison(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     out = []
     for it in items:
-        t = _f(it.get("today"))
-        y = _f(it.get("yesterday"))
+        t, y = _f(it.get("today")), _f(it.get("yesterday"))
         if t is None:
             out.append({**it, "diff": None, "change_pct": None})
             continue
@@ -182,52 +177,126 @@ def enrich_comparison(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return out
 
 # ==========================================
-# ۱. دریافت داده‌های کلان واقعی (تتر زنده نوبیتکس، ارزهای جهانی، شاخص ترس و طمع)
+# ۱. دریافت موازی و بدون سکوت خطا برای نرخ تتر، ارزها و ترس/طمع
 # ==========================================
-async def load_macro_live(force: bool = False):
+async def _probe_usdt_toman(brs_key: str) -> Tuple[Optional[float], str]:
+    diag = []
+    async with httpx.AsyncClient(timeout=3.5, headers=BRSAPI_HEADERS) as client:
+        async def try_nobitex_v3():
+            try:
+                r = await client.get("https://apiv2.nobitex.ir/v3/orderbook/USDTIRT")
+                if r.status_code == 200:
+                    p = _f(r.json().get("lastTradePrice"))
+                    if p and p > 10000:
+                        return round(p / 10.0, 1), "LIVE_NOBITEX_V3"
+                return None, f"NOBITEX_V3:{r.status_code}"
+            except Exception as e:
+                return None, f"NOBITEX_V3:{type(e).__name__}"
+
+        async def try_wallex():
+            try:
+                r = await client.get("https://api.wallex.ir/v1/markets")
+                if r.status_code == 200:
+                    syms = ((r.json().get("result") or {}).get("symbols") or {})
+                    tmn = _f(((syms.get("USDTTMN") or {}).get("stats") or {}).get("lastPrice"))
+                    if tmn and tmn > 1000:
+                        return round(tmn, 1), "LIVE_WALLEX"
+                    irt = _f(((syms.get("USDTIRT") or {}).get("stats") or {}).get("lastPrice"))
+                    if irt and irt > 10000:
+                        return round(irt / 10.0, 1), "LIVE_WALLEX_IRT"
+                return None, f"WALLEX:{r.status_code}"
+            except Exception as e:
+                return None, f"WALLEX:{type(e).__name__}"
+
+        async def try_tetherland():
+            try:
+                r = await client.get("https://api.tetherland.com/currencies")
+                if r.status_code == 200:
+                    usdt = (((r.json().get("data") or {}).get("currencies") or {}).get("USDT") or {})
+                    p = _f(usdt.get("price"))
+                    if p and p > 1000:
+                        return round(p, 1), "LIVE_TETHERLAND"
+                return None, f"TETHERLAND:{r.status_code}"
+            except Exception as e:
+                return None, f"TETHERLAND:{type(e).__name__}"
+
+        async def try_bitpin():
+            try:
+                r = await client.get("https://api.bitpin.ir/v1/mkt/markets/")
+                if r.status_code == 200:
+                    for m in (r.json().get("results") or []):
+                        if m.get("code") == "USDT_IRT":
+                            p = _f(m.get("price"))
+                            if p and p > 1000:
+                                return round(p, 1), "LIVE_BITPIN"
+                return None, f"BITPIN:{r.status_code}"
+            except Exception as e:
+                return None, f"BITPIN:{type(e).__name__}"
+
+        async def try_brs_usd():
+            if not brs_key:
+                return None, "BRS_FX:NO_KEY"
+            try:
+                r = await client.get("https://Api.BrsApi.ir/Market/Gold_Currency.php", params={"key": brs_key})
+                if r.status_code == 200:
+                    data = r.json()
+                    rows = data.get("currency") if isinstance(data, dict) else _unwrap_list(data)
+                    for row in (rows or []):
+                        if str(row.get("symbol") or "").upper() in ("USD", "USDT"):
+                            p = _f(row.get("price"))
+                            if p and p > 1000:
+                                return round(p, 1), "LIVE_BRSAPI_FX"
+                return None, f"BRS_FX:{r.status_code}"
+            except Exception as e:
+                return None, f"BRS_FX:{type(e).__name__}"
+
+        results = await asyncio.gather(try_nobitex_v3(), try_wallex(), try_tetherland(), try_bitpin(), try_brs_usd())
+        for val, src in results:
+            if val is not None:
+                return val, src
+            diag.append(src)
+    return None, " | ".join(diag)
+
+async def load_macro_live(brs_key_override: str = "", force: bool = False):
+    brs_key = (brs_key_override or os.getenv("BRSAPI_KEY", "")).strip()
     now = time.time()
-    if not force and MACRO_CACHE["ts"] > 0 and (now - MACRO_CACHE["ts"] < 120):
+    if not force and MACRO_CACHE["ts"] > 0 and (now - MACRO_CACHE["ts"] < 120) and MACRO_CACHE["key_used"] == brs_key:
         return MACRO_CACHE
 
-    async with httpx.AsyncClient(timeout=4.5) as client:
-        # الف) قیمت زنده تتر به تومان از نوبیتکس (بدون عدد ثابت ۷۰۲۰۰)
-        try:
-            r_nb = await client.get("https://api.nobitex.ir/market/stats?srcCurrency=usdt&dstCurrency=rls")
-            if r_nb.status_code == 200:
-                st = (r_nb.json().get("stats") or {}).get("usdt-rls") or {}
-                last_r = _f(st.get("latest"))
-                if last_r and last_r > 0:
-                    MACRO_CACHE["usdt_toman"] = round(last_r / 10.0, 1)
-                    MACRO_CACHE["usdt_source"] = "LIVE_NOBITEX"
-        except Exception:
-            pass
+    async with httpx.AsyncClient(timeout=3.5) as client:
+        async def fetch_fx():
+            try:
+                r = await client.get("https://open.er-api.com/v6/latest/USD")
+                if r.status_code == 200:
+                    rates = r.json().get("rates") or {}
+                    if rates:
+                        return rates, "LIVE_OPEN_ER_API"
+                return {}, f"FX:{r.status_code}"
+            except Exception as e:
+                return {}, f"FX:{type(e).__name__}"
 
-        # ب) نرخ زنده ارزهای جهانی نسبت به دلار
-        try:
-            r_fx = await client.get("https://open.er-api.com/v6/latest/USD")
-            if r_fx.status_code == 200:
-                rates = r_fx.json().get("rates") or {}
-                if rates:
-                    MACRO_CACHE["fx_rates"] = rates
-                    MACRO_CACHE["fx_source"] = "LIVE_OPEN_ER_API"
-        except Exception:
-            pass
+        async def fetch_fng():
+            try:
+                r = await client.get("https://api.alternative.me/fng/?limit=2")
+                if r.status_code == 200:
+                    d = r.json().get("data") or []
+                    if d:
+                        return {"value": int(d[0]["value"]), "label": d[0]["value_classification"],
+                                "yesterday": int(d[1]["value"]) if len(d) > 1 else None}
+            except Exception:
+                pass
+            return None
 
-        # پ) شاخص زنده ترس و طمع بازار کریپتو (Alternative.me)
-        try:
-            r_fg = await client.get("https://api.alternative.me/fng/?limit=2")
-            if r_fg.status_code == 200:
-                d = r_fg.json().get("data") or []
-                if d:
-                    MACRO_CACHE["fng"] = {
-                        "value": int(d[0]["value"]),
-                        "label": d[0]["value_classification"],
-                        "yesterday": int(d[1]["value"]) if len(d) > 1 else None
-                    }
-        except Exception:
-            pass
+        (usdt_val, usdt_src), (fx_rates, fx_src), fng_val = await asyncio.gather(
+            _probe_usdt_toman(brs_key), fetch_fx(), fetch_fng()
+        )
 
-    MACRO_CACHE["ts"] = now
+    MACRO_CACHE.update({
+        "ts": now, "key_used": brs_key,
+        "usdt_toman": usdt_val, "usdt_source": usdt_src,
+        "fx_rates": fx_rates or MACRO_CACHE["fx_rates"], "fx_source": fx_src,
+        "fng": fng_val or MACRO_CACHE["fng"],
+    })
     return MACRO_CACHE
 
 async def load_all_crypto(force: bool = False):
@@ -237,47 +306,53 @@ async def load_all_crypto(force: bool = False):
 
     merged: Dict[str, Dict[str, Any]] = {}
     sources_used = []
-    async with httpx.AsyncClient(timeout=5.0) as client:
-        try:
-            r = await client.get("https://data-api.binance.vision/api/v3/ticker/24hr")
-            if r.status_code == 200:
-                sources_used.append("BINANCE")
-                for row in r.json():
-                    sym = row.get("symbol", "")
-                    if not sym.endswith("USDT") or any(x in sym for x in ("UPUSDT", "DOWNUSDT", "BULL", "BEAR")):
-                        continue
-                    base = sym[:-4]
-                    last_p, prev_p, qvol = _f(row.get("lastPrice")), _f(row.get("prevClosePrice")), _f(row.get("quoteVolume")) or 0.0
-                    if last_p and last_p > 0 and qvol > 20000:
-                        fa = CRYPTO_FA_NAMES.get(base, "")
-                        merged[base] = {
-                            "symbol": base, "fa_name": fa, "name": f"{fa.split()[0] + ' - ' if fa else ''}{base}/USDT",
-                            "search_key": norm_fa(f"{base} {fa}"), "market": "CRYPTO",
-                            "today": last_p, "yesterday": prev_p if (prev_p and prev_p > 0) else last_p, "unit": "دلار", "quote_vol": qvol
-                        }
-        except Exception:
-            pass
+    async with httpx.AsyncClient(timeout=4.5) as client:
+        async def get_bin():
+            try:
+                r = await client.get("https://data-api.binance.vision/api/v3/ticker/24hr")
+                return r.json() if r.status_code == 200 else []
+            except Exception:
+                return []
 
-        try:
-            r2 = await client.get("https://api.kucoin.com/api/v1/market/allTickers")
-            if r2.status_code == 200:
-                sources_used.append("KUCOIN")
-                for row in (r2.json().get("data") or {}).get("ticker", []):
-                    sym = row.get("symbol", "")
-                    if not sym.endswith("-USDT"):
-                        continue
-                    base = sym[:-5]
-                    last_p, chg_rate, qvol = _f(row.get("last")), _f(row.get("changeRate")) or 0.0, _f(row.get("volValue")) or 0.0
-                    if last_p and last_p > 0 and base not in merged and qvol > 5000:
-                        fa = CRYPTO_FA_NAMES.get(base, "")
-                        yest = last_p / (1.0 + chg_rate) if chg_rate > -0.99 else last_p
-                        merged[base] = {
-                            "symbol": base, "fa_name": fa, "name": f"{fa.split()[0] + ' - ' if fa else ''}{base}/USDT",
-                            "search_key": norm_fa(f"{base} {fa}"), "market": "CRYPTO",
-                            "today": last_p, "yesterday": round(yest, 8), "unit": "دلار", "quote_vol": qvol
-                        }
-        except Exception:
-            pass
+        async def get_kuc():
+            try:
+                r = await client.get("https://api.kucoin.com/api/v1/market/allTickers")
+                return ((r.json().get("data") or {}).get("ticker") or []) if r.status_code == 200 else []
+            except Exception:
+                return []
+
+        b_rows, k_rows = await asyncio.gather(get_bin(), get_kuc())
+        if b_rows:
+            sources_used.append("BINANCE")
+            for row in b_rows:
+                sym = row.get("symbol", "")
+                if not sym.endswith("USDT") or any(x in sym for x in ("UPUSDT", "DOWNUSDT", "BULL", "BEAR")):
+                    continue
+                base = sym[:-4]
+                last_p, prev_p, qvol = _f(row.get("lastPrice")), _f(row.get("prevClosePrice")), _f(row.get("quoteVolume")) or 0.0
+                if last_p and last_p > 0 and qvol > 20000:
+                    fa = CRYPTO_FA_NAMES.get(base, "")
+                    merged[base] = {
+                        "symbol": base, "fa_name": fa, "name": f"{fa.split()[0] + ' - ' if fa else ''}{base}/USDT",
+                        "search_key": norm_fa(f"{base} {fa}"), "market": "CRYPTO",
+                        "today": last_p, "yesterday": prev_p if (prev_p and prev_p > 0) else last_p, "unit": "دلار", "quote_vol": qvol
+                    }
+        if k_rows:
+            sources_used.append("KUCOIN")
+            for row in k_rows:
+                sym = row.get("symbol", "")
+                if not sym.endswith("-USDT"):
+                    continue
+                base = sym[:-5]
+                last_p, chg_rate, qvol = _f(row.get("last")), _f(row.get("changeRate")) or 0.0, _f(row.get("volValue")) or 0.0
+                if last_p and last_p > 0 and base not in merged and qvol > 5000:
+                    fa = CRYPTO_FA_NAMES.get(base, "")
+                    yest = last_p / (1.0 + chg_rate) if chg_rate > -0.99 else last_p
+                    merged[base] = {
+                        "symbol": base, "fa_name": fa, "name": f"{fa.split()[0] + ' - ' if fa else ''}{base}/USDT",
+                        "search_key": norm_fa(f"{base} {fa}"), "market": "CRYPTO",
+                        "today": last_p, "yesterday": round(yest, 8), "unit": "دلار", "quote_vol": qvol
+                    }
 
     if merged:
         items = sorted(merged.values(), key=lambda x: x["quote_vol"], reverse=True)
@@ -287,13 +362,14 @@ async def load_all_crypto(force: bool = False):
 async def load_all_bourse(brs_key_override: str = "", force: bool = False):
     brs_key = (brs_key_override or os.getenv("BRSAPI_KEY", "")).strip()
     now = time.time()
-    if not force and BOURSE_CACHE["items"] and (now - BOURSE_CACHE["ts"] < 120) and BOURSE_CACHE["key_used"] == brs_key:
+    # اصلاح باگ سرعت ۴.۵ ثانیه‌ای: اگر قبلاً چک شده (حتی اگر خالی باشد)، تا ۱۲۰ ثانیه دوباره معطل timeout نشو
+    if not force and BOURSE_CACHE["ts"] > 0 and (now - BOURSE_CACHE["ts"] < 120) and BOURSE_CACHE["key_used"] == brs_key:
         return BOURSE_CACHE
 
     items, diag = [], []
     if brs_key:
         try:
-            async with httpx.AsyncClient(timeout=7.0, headers=BRSAPI_HEADERS) as client:
+            async with httpx.AsyncClient(timeout=6.0, headers=BRSAPI_HEADERS) as client:
                 r = await client.get("https://Api.BrsApi.ir/Tsetmc/AllSymbols.php", params={"key": brs_key, "type": "1"})
                 diag.append(f"BRS_ALL:{r.status_code}")
                 if r.status_code == 200:
@@ -318,7 +394,8 @@ async def load_all_bourse(brs_key_override: str = "", force: bool = False):
     else:
         diag.append("BRS_KEY:EMPTY")
 
-    async with httpx.AsyncClient(timeout=4.5, headers=TSETMC_HEADERS) as client:
+    # کاهش timeout مستقیم به ۲ ثانیه تا هیچ‌گاه باعث کندی ۴.۵ ثانیه‌ای سایت نشود
+    async with httpx.AsyncClient(timeout=2.0, headers=TSETMC_HEADERS) as client:
         try:
             pt = "&".join(f"paperTypes%5B{i}%5D={i+1}" for i in range(9))
             r = await client.get(f"https://cdn.tsetmc.com/api/ClosingPrice/GetMarketWatch?market=0&{pt}&showTraded=false&withBestLimits=false&hEven=0&RefID=0")
@@ -341,7 +418,7 @@ async def load_all_bourse(brs_key_override: str = "", force: bool = False):
                     BOURSE_CACHE.update({"ts": now, "items": items, "source": f"LIVE_TSETMC ({len(items)} نماد)", "key_used": brs_key})
                     return BOURSE_CACHE
         except Exception as e:
-            diag.append(f"TSETMC_ERR:{type(e).__name__}")
+            diag.append(f"TSETMC:{type(e).__name__}")
 
     BOURSE_CACHE.update({"ts": now, "items": items, "source": " | ".join(diag), "key_used": brs_key})
     return BOURSE_CACHE
@@ -362,7 +439,7 @@ async def fetch_180_candles(symbol: str, market: str, item: Dict[str, Any], brs_
 
     candles, diag = [], []
     if market == "CRYPTO":
-        async with httpx.AsyncClient(timeout=4.5) as client:
+        async with httpx.AsyncClient(timeout=4.0) as client:
             try:
                 r = await client.get(f"https://data-api.binance.vision/api/v3/klines?symbol={symbol.upper()}USDT&interval=1d&limit=180")
                 if r.status_code == 200 and isinstance(r.json(), list):
@@ -392,7 +469,7 @@ async def fetch_180_candles(symbol: str, market: str, item: Dict[str, Any], brs_
     elif market == "BOURSE":
         if brs_key:
             try:
-                async with httpx.AsyncClient(timeout=7.0, headers=BRSAPI_HEADERS) as client:
+                async with httpx.AsyncClient(timeout=6.0, headers=BRSAPI_HEADERS) as client:
                     rh = await client.get("https://Api.BrsApi.ir/Tsetmc/History.php", params={"key": brs_key, "type": "0", "l18": symbol})
                     diag.append(f"BRS_HIST:{rh.status_code}")
                     if rh.status_code == 200:
@@ -416,7 +493,7 @@ async def fetch_180_candles(symbol: str, market: str, item: Dict[str, Any], brs_
         else:
             diag.append("BRS_KEY:EMPTY")
 
-        async with httpx.AsyncClient(timeout=5.0, headers=TSETMC_HEADERS) as client:
+        async with httpx.AsyncClient(timeout=2.5, headers=TSETMC_HEADERS) as client:
             ins_code = item.get("ins_code")
             if ins_code:
                 try:
@@ -442,9 +519,6 @@ async def fetch_180_candles(symbol: str, market: str, item: Dict[str, Any], brs_
 
     return {"ts": now, "source": " | ".join(diag) or "NO_DATA", "candles": []}
 
-# ==========================================
-# اصلاح ریاضی ۱: فرمول دقیق Wilder's RMA RSI مطابق TradingView
-# ==========================================
 def calc_ema(vals: List[float], period: int) -> List[float]:
     k = 2.0 / (period + 1)
     out = [vals[0]]
@@ -453,10 +527,6 @@ def calc_ema(vals: List[float], period: int) -> List[float]:
     return out
 
 def calc_wilder_rsi_points(candles: List[Dict[str, Any]], period: int = 14) -> List[Dict[str, Any]]:
-    """
-    محاسبه دقیق RSI با روش Wilder Smoothing (استاندارد تریدینگ‌ویو).
-    خروجی فقط از کندل index >= period برگردانده می‌شود تا عدد جعلی در دوره warmup رسم نشود.
-    """
     n = len(candles)
     if n <= period:
         return []
@@ -473,8 +543,7 @@ def calc_wilder_rsi_points(candles: List[Dict[str, Any]], period: int = 14) -> L
     def _to_rsi(ag, al):
         if al == 0.0:
             return 100.0 if ag > 0.0 else 50.0
-        rs = ag / al
-        return round(100.0 - (100.0 / (1.0 + rs)), 2)
+        return round(100.0 - (100.0 / (1.0 + (ag / al))), 2)
 
     pts = [{"time": candles[period]["time"], "value": _to_rsi(avg_g, avg_l)}]
     for k in range(period, len(gains)):
@@ -565,7 +634,6 @@ def analyze_full(symbol: str, market: str, item: Dict[str, Any], candles: List[D
     pa_markers, pa_sup, pa_res = detect_price_action(candles)
     structure = "روند صعودی (بالای EMA20 و EMA50)" if price > ema20[-1] > ema50[-1] else ("روند نزولی (زیر EMA20 و EMA50)" if price < ema20[-1] < ema50[-1] else "فاز رنج / تغییر روند")
 
-    # ۴ بازه دقیق: روزانه تا ۱۲۰ روزه با رعایت قفل عدم جعل عدد در نبود دیتا
     fee_pct = 1.25 if market == "BOURSE" else 0.20
     contracts = {}
     for hk, spec in HORIZON_SPECS.items():
@@ -579,7 +647,6 @@ def analyze_full(symbol: str, market: str, item: Dict[str, Any], candles: List[D
         else:
             atr_tp = price * (1.0 + min(daily_vol * spec["vol_scale"] * 1.45, 0.65))
             atr_sl = price * (1.0 - min(daily_vol * spec["vol_scale"] * 0.72, 0.28))
-            # لنگر زدن حد ضرر به حمایت واقعی پرایس اکشن در بازه‌های کوتاه/میان‌مدت
             if hk in ("H1_DAILY", "H2_WEEKLY") and 0 < pa_sup < price:
                 sl_v = round(max(atr_sl, pa_sup * 0.992), 6)
             else:
@@ -607,7 +674,6 @@ def analyze_full(symbol: str, market: str, item: Dict[str, Any], candles: List[D
                 "net_return_pct": net_ret, "net_risk_pct": net_rsk, "rr": rr
             }
 
-    # روانشناسی چندعاملی (Wilder RSI + نسبت حجم + فاصله از EMA20 + شاخص ترس و طمع زنده)
     avg_vol20 = sum(vols[-21:-1]) / max(len(vols[-21:-1]), 1) if len(vols) > 2 else (vols[-1] or 1.0)
     vol_ratio = round(vols[-1] / avg_vol20, 2) if avg_vol20 > 0 else 1.0
     ext_pct = round(((price - ema20[-1]) / ema20[-1]) * 100.0, 2) if ema20[-1] > 0 else 0.0
@@ -651,12 +717,8 @@ def analyze_full(symbol: str, market: str, item: Dict[str, Any], candles: List[D
         "macd": [{"time": candles[i]["time"], "value": macd_l[i]} for i in range(n)],
         "macd_signal": [{"time": candles[i]["time"], "value": sig_l[i]} for i in range(n)],
         "macd_hist": [{"time": candles[i]["time"], "value": hist_l[i], "color": "#10b981" if hist_l[i] >= 0 else "#ef4444"} for i in range(n)],
-        "pa_markers": pa_markers,
-        "pa_support": pa_sup,
-        "pa_resistance": pa_res,
-        "fib": fib,
-        "rsi_now": rsi_now,
-        "structure": structure,
+        "pa_markers": pa_markers, "pa_support": pa_sup, "pa_resistance": pa_res,
+        "fib": fib, "rsi_now": rsi_now, "structure": structure,
     }
 
     return {
@@ -664,44 +726,33 @@ def analyze_full(symbol: str, market: str, item: Dict[str, Any], candles: List[D
         "psychology": {"mood": mood, "advice": advice}, "strategies": strategies, "contracts": contracts,
     }
 
-# ==========================================
-# اندپوینت خودآزمون دقیق (Self-Test) برای تایید صحت ریاضی و دیتای زنده
-# ==========================================
 @app.get("/api/self-test")
 async def run_self_test(brs_key: str = ""):
     checks = []
-
-    # تست ۱: رفرنس ریاضی استاندارد StockCharts برای Wilder's RSI(14)
     ref_closes = [44.34, 44.09, 44.15, 43.61, 44.33, 44.83, 45.10, 45.42, 45.84, 46.08, 45.89, 46.03, 45.61, 46.28, 46.28, 46.00]
     ref_candles = [{"time": 1700000000 + i * 86400, "open": c, "high": c, "low": c, "close": c, "vol": 100} for i, c in enumerate(ref_closes)]
     rsi_out = calc_wilder_rsi_points(ref_candles, 14)
     rsi_ok = len(rsi_out) == 2 and abs(rsi_out[0]["value"] - 70.46) < 0.1 and abs(rsi_out[1]["value"] - 66.25) < 0.1
     checks.append({"name": "Wilder RSI(14) Reference Math", "passed": rsi_ok, "detail": f"got={rsi_out}, expected=[70.46, 66.25]"})
 
-    # تست ۲: تبدیل تاریخ شمسی به میلادی واقعی
-    g1 = jalali_to_gregorian(1403, 1, 1)
-    g2 = jalali_to_gregorian(1405, 8, 24)
-    j_ok = (g1 == (2024, 3, 20)) and (g2 == (2026, 11, 15))
-    checks.append({"name": "Jalali-to-Gregorian Calendar Math", "passed": j_ok, "detail": f"1403/1/1->{g1}, 1405/8/24->{g2}"})
+    g1, g2 = jalali_to_gregorian(1403, 1, 1), jalali_to_gregorian(1405, 8, 24)
+    checks.append({"name": "Jalali-to-Gregorian Calendar Math", "passed": (g1 == (2024, 3, 20) and g2 == (2026, 11, 15)), "detail": f"1403/1/1->{g1}, 1405/8/24->{g2}"})
 
-    # تست ۳: گیت عدم جعل عدد در دیتای کم (کمتر از ۱۵ کندل)
     short_res = analyze_full("TEST", "CRYPTO", {"quote_vol": 0}, ref_candles[:8])
     gate_ok = all(not c["evaluatable"] and c["target"] is None and c["stop"] is None for c in short_res["contracts"].values())
     checks.append({"name": "Insufficient Data No-Fabrication Gate", "passed": gate_ok, "detail": "8 bars -> all 4 horizons locked to None"})
 
-    # تست ۴: اتصال زنده به منابع واقعی
-    c_data, b_data, macro = await asyncio.gather(load_all_crypto(), load_all_bourse(brs_key), load_macro_live())
+    c_data, b_data, macro = await asyncio.gather(load_all_crypto(), load_all_bourse(brs_key), load_macro_live(brs_key, force=True))
     checks.append({"name": "Live Crypto Universe (>=300 coins)", "passed": len(c_data["items"]) >= 300, "detail": f"count={len(c_data['items'])}, src={c_data['source']}"})
-    checks.append({"name": "Live USDT-Toman (Nobitex, no hardcoded 70200)", "passed": macro["usdt_toman"] is not None, "detail": f"usdt={macro['usdt_toman']}, src={macro['usdt_source']}"})
+    checks.append({"name": "Live USDT-Toman (5 Sources, no fake 70200)", "passed": macro["usdt_toman"] is not None, "detail": f"usdt={macro['usdt_toman']}, src={macro['usdt_source']}"})
     checks.append({"name": "Live Global FX Rates", "passed": len(macro["fx_rates"]) >= 10, "detail": f"src={macro['fx_source']}"})
     checks.append({"name": "Live Iran Bourse (>=500 symbols)", "passed": len(b_data["items"]) >= 500, "detail": f"count={len(b_data['items'])}, src={b_data['source']}"})
 
-    all_math_ok = all(x["passed"] for x in checks[:3])
-    return {"all_math_tests_passed": all_math_ok, "checks": checks}
+    return {"all_math_tests_passed": all(x["passed"] for x in checks[:3]), "checks": checks}
 
 @app.get("/api/system-status")
 async def system_status(brs_key: str = ""):
-    c_data, b_data, macro = await asyncio.gather(load_all_crypto(), load_all_bourse(brs_key), load_macro_live())
+    c_data, b_data, macro = await asyncio.gather(load_all_crypto(), load_all_bourse(brs_key), load_macro_live(brs_key))
     return {
         "timestamp_tehran": datetime.now(TEHRAN_TZ).strftime("%Y-%m-%d %H:%M"),
         "crypto_count": len(c_data["items"]), "crypto_source": c_data["source"],
@@ -731,7 +782,7 @@ async def analyze_endpoint(symbol: str, market: str = "AUTO", brs_key: str = "")
     t0 = time.time()
     q_norm = norm_fa(symbol)
     mkt_u = market.strip().upper()
-    c_data, b_data, macro = await asyncio.gather(load_all_crypto(), load_all_bourse(brs_key), load_macro_live())
+    c_data, b_data, macro = await asyncio.gather(load_all_crypto(), load_all_bourse(brs_key), load_macro_live(brs_key))
 
     item = None
     if mkt_u in ("AUTO", "BOURSE"):
@@ -777,11 +828,9 @@ async def top5_scanner():
 
 @app.get("/api/watchlists")
 async def watchlists(brs_key: str = ""):
-    c_data, b_data, macro = await asyncio.gather(load_all_crypto(), load_all_bourse(brs_key), load_macro_live())
-    usdt_t = macro["usdt_toman"]
-    fx_rates = macro["fx_rates"]
+    c_data, b_data, macro = await asyncio.gather(load_all_crypto(), load_all_bourse(brs_key), load_macro_live(brs_key))
+    usdt_t, fx_rates = macro["usdt_toman"], macro["fx_rates"]
 
-    # ساخت جدول زنده ارزهای کشورها از API واقعی open.er-api + تتر نوبیتکس (بدون عدد ثابت فیک)
     fx_names = [("USD", "دلار آمریکا"), ("EUR", "یورو اروپا"), ("GBP", "پوند انگلیس"), ("AED", "درهم امارات"),
                 ("TRY", "لیر ترکیه"), ("CNY", "یوان چین"), ("CAD", "دلار کانادا"), ("AUD", "دلار استرالیا"),
                 ("CHF", "فرانک سوئیس"), ("JPY", "ین ژاپن"), ("SAR", "ریال عربستان"), ("RUB", "روبل روسیه"),
@@ -790,21 +839,17 @@ async def watchlists(brs_key: str = ""):
     for code, fa in fx_names:
         rate_per_usd = fx_rates.get(code)
         if rate_per_usd and usdt_t:
-            t_val = round(usdt_t / float(rate_per_usd), 2)
-            forex_list.append({"symbol": code, "name": fa, "today": t_val, "yesterday": None, "unit": "تومان (زنده)"})
+            forex_list.append({"symbol": code, "name": fa, "today": round(usdt_t / float(rate_per_usd), 2), "yesterday": None, "unit": "تومان (زنده)"})
         elif rate_per_usd:
             forex_list.append({"symbol": code, "name": fa, "today": round(float(rate_per_usd), 4), "yesterday": None, "unit": "نسبت به USD"})
 
-    # انس طلا و نقره/مس یا پکس‌گلد زنده از کریپتو
     paxg = next((x for x in c_data["items"] if x["symbol"] == "PAXG"), None)
     metals_list = []
     if paxg:
-        metals_list.append({"symbol": "PAXG/XAU", "name": "انس جهانی طلا (معادل توکن طلا)", "today": paxg["today"], "yesterday": paxg["yesterday"], "unit": "دلار (زنده)"})
+        metals_list.append({"symbol": "PAXG/XAU", "name": "انس جهانی طلا", "today": paxg["today"], "yesterday": paxg["yesterday"], "unit": "دلار (زنده)"})
         if usdt_t:
-            gram18 = round((paxg["today"] * usdt_t / 31.1035) * 0.75, 0)
-            metals_list.append({"symbol": "GOLD18_EST", "name": "طلای ۱۸ عیار تئوری (بر مبنای انس و تتر زنده)", "today": gram18, "yesterday": None, "unit": "تومان"})
+            metals_list.append({"symbol": "GOLD18_EST", "name": "طلای ۱۸ عیار تئوری (انس و تتر زنده)", "today": round((paxg["today"] * usdt_t / 31.1035) * 0.75, 0), "yesterday": None, "unit": "تومان"})
 
-    # صندوق‌های واقعی از بورس در صورت اتصال
     etf_keywords = ("صندوق", "درآمد", "اهرم", "طلا", "عیار", "کهربا", "کمند", "کیان", "آگاس")
     etf_list = [x for x in b_data["items"] if any(k in x["name"] or k in x["symbol"] for k in etf_keywords)][:15]
 
@@ -841,7 +886,7 @@ def del_pf(pid: int):
 
 @app.get("/api/portfolio")
 async def get_pf(brs_key: str = ""):
-    c_data, b_data, macro = await asyncio.gather(load_all_crypto(), load_all_bourse(brs_key), load_macro_live())
+    c_data, b_data, macro = await asyncio.gather(load_all_crypto(), load_all_bourse(brs_key), load_macro_live(brs_key))
     usdt_t = macro["usdt_toman"]
     conn = get_conn()
     rows = conn.execute("SELECT id, symbol, market, quantity, avg_buy_price_toman FROM portfolio").fetchall()
@@ -860,7 +905,7 @@ async def get_pf(brs_key: str = ""):
             sig = "فروش (حد ضرر)" if pnl <= -6 else ("سیو سود" if pnl >= 15 else "نگهداری / پایش")
             cur_p, pnl = round(cur_p, 2), round(pnl, 2)
         out.append({"id": pid, "symbol": sym, "market": mkt, "quantity": qty, "buy_price": buy_p,
-                    "current_price": cur_p, "pnl_pct": pnl, "signal": sig, "storage": "EPHEMERAL_TMP_ON_VERCEL"})
+                    "current_price": cur_p, "pnl_pct": pnl, "signal": sig})
     return out
 
 @app.get("/", response_class=HTMLResponse)
@@ -869,4 +914,4 @@ def home():
         return f.read()
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=int(os.getenv("PORT", 8000)))
+    uvicorn.run("main:app", host="0.0.0.0", port=int(os.getenv("PORT", 8000)))ل
