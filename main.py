@@ -11,11 +11,12 @@ from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
 TEHRAN_TZ = timezone(timedelta(hours=3, minutes=30))
-DB_FILE = "standalone_market.db"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_FILE = "/tmp/standalone_market.db" if os.path.isdir("/tmp") else os.path.join(BASE_DIR, "standalone_market.db")
 
 app = FastAPI(title="سایت مستقل تحلیل بازار، پرایس اکشن، بنیادی و روانشناسی")
 
-def init_db():
+def get_conn():
     conn = sqlite3.connect(DB_FILE)
     conn.execute("""
         CREATE TABLE IF NOT EXISTS portfolio (
@@ -28,9 +29,7 @@ def init_db():
         )
     """)
     conn.commit()
-    conn.close()
-
-init_db()
+    return conn
 
 HORIZON_SPECS = {
     "H1_DAILY":     {"label": "روزانه",   "min_bars": 5,  "tp_mult": 1.028, "sl_mult": 0.985},
@@ -508,7 +507,7 @@ class PortfolioIn(BaseModel):
 
 @app.post("/api/portfolio")
 def add_portfolio(item: PortfolioIn):
-    conn = sqlite3.connect(DB_FILE)
+    conn = get_conn()
     conn.execute("INSERT INTO portfolio (symbol, market, quantity, avg_buy_price_toman, created_at) VALUES (?, ?, ?, ?, ?)",
                  (item.symbol.strip(), item.market.upper(), item.quantity, item.avg_buy_price_toman, datetime.now(TEHRAN_TZ).isoformat()))
     conn.commit()
@@ -517,7 +516,7 @@ def add_portfolio(item: PortfolioIn):
 
 @app.delete("/api/portfolio/{pid}")
 def del_portfolio(pid: int):
-    conn = sqlite3.connect(DB_FILE)
+    conn = get_conn()
     conn.execute("DELETE FROM portfolio WHERE id = ?", (pid,))
     conn.commit()
     conn.close()
@@ -527,7 +526,7 @@ def del_portfolio(pid: int):
 async def get_portfolio():
     await try_fetch_live_crypto()
     usd = next((x["today"] for x in WATCHLIST_DATA["forex"] if x["symbol"] == "USD"), 70200)
-    conn = sqlite3.connect(DB_FILE)
+    conn = get_conn()
     rows = conn.execute("SELECT id, symbol, market, quantity, avg_buy_price_toman FROM portfolio").fetchall()
     conn.close()
     out = []
@@ -556,9 +555,10 @@ async def get_portfolio():
 
 @app.get("/", response_class=HTMLResponse)
 def home():
-    with open("index.html", "r", encoding="utf-8") as f:
+    html_path = os.path.join(BASE_DIR, "index.html")
+    with open(html_path, "r", encoding="utf-8") as f:
         return f.read()
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 8000))
-    uvicorn.run("backend:app", host="0.0.0.0", port=port)
+    uvicorn.run("main:app", host="0.0.0.0", port=port)
