@@ -1,4 +1,5 @@
 import os
+import math
 import time
 import asyncio
 import sqlite3
@@ -23,13 +24,12 @@ TSETMC_HEADERS = {
     "Origin": "https://tsetmc.com",
 }
 
-# هدر رسمی مورد تایید فایروال BrsApi (بدون Referer اشتباه)
 BRSAPI_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36 OPR/106.0.0.0",
     "Accept": "application/json, text/plain, */*",
 }
 
-app = FastAPI(title="تحلیل کل بورس (۷۰۰+ نماد) و کل کریپتو (فارسی و انگلیسی)")
+app = FastAPI(title="چارت کندل‌استیک حرفه‌ای + تحلیل کل بازار")
 
 def norm_fa(text: str) -> str:
     if not text:
@@ -56,6 +56,15 @@ def _unwrap_list(payload) -> list:
             if isinstance(payload.get(k), list):
                 return payload[k]
     return []
+
+def _to_iso_date(raw_date, fallback_idx: int, total: int) -> str:
+    s = str(raw_date or "").strip()
+    if len(s) == 8 and s.isdigit() and s.startswith("20"):
+        return f"{s[:4]}-{s[4:6]}-{s[6:8]}"
+    if len(s) >= 10 and s[:4].isdigit() and s[:2] == "20":
+        return s[:10].replace("/", "-")
+    dt = datetime.now(TEHRAN_TZ) - timedelta(days=(total - 1 - fallback_idx))
+    return dt.strftime("%Y-%m-%d")
 
 CRYPTO_FA_NAMES = {
     "BTC": "بیت کوین بیتکوین", "ETH": "اتریوم اتريوم", "SOL": "سولانا سول",
@@ -237,15 +246,13 @@ async def load_all_bourse(brs_key_override: str = "", force: bool = False):
 
     items = []
     diag = []
-
     if brs_key:
         try:
             async with httpx.AsyncClient(timeout=7.0, headers=BRSAPI_HEADERS) as client:
                 r = await client.get("https://Api.BrsApi.ir/Tsetmc/AllSymbols.php", params={"key": brs_key, "type": "1"})
                 diag.append(f"BRS_ALL:{r.status_code}")
                 if r.status_code == 200:
-                    rows = _unwrap_list(r.json())
-                    for x in rows:
+                    for x in _unwrap_list(r.json()):
                         sym = str(x.get("l18") or "").strip()
                         t_rial = _f(x.get("pl") or x.get("pc"))
                         y_rial = _f(x.get("py")) or t_rial
@@ -268,12 +275,10 @@ async def load_all_bourse(brs_key_override: str = "", force: bool = False):
     async with httpx.AsyncClient(timeout=4.5, headers=TSETMC_HEADERS) as client:
         try:
             pt = "&".join(f"paperTypes%5B{i}%5D={i+1}" for i in range(9))
-            url = f"https://cdn.tsetmc.com/api/ClosingPrice/GetMarketWatch?market=0&{pt}&showTraded=false&withBestLimits=false&hEven=0&RefID=0"
-            r = await client.get(url)
-            diag.append(f"TSETMC_MW:{r.status_code}")
+            r = await client.get(f"https://cdn.tsetmc.com/api/ClosingPrice/GetMarketWatch?market=0&{pt}&showTraded=false&withBestLimits=false&hEven=0&RefID=0")
+            diag.append(f"TSETMC:{r.status_code}")
             if r.status_code == 200:
-                rows = r.json().get("marketwatch") or []
-                for x in rows:
+                for x in (r.json().get("marketwatch") or []):
                     sym = str(x.get("lVal18AFC") or "").strip()
                     t_rial = _f(x.get("pClosing") or x.get("pDrCotVal"))
                     y_rial = _f(x.get("priceYesterday")) or t_rial
@@ -289,33 +294,17 @@ async def load_all_bourse(brs_key_override: str = "", force: bool = False):
                     BOURSE_CACHE.update({"ts": now, "items": items, "source": f"LIVE_TSETMC ({len(items)} نماد)", "key_used": brs_key})
                     return BOURSE_CACHE
         except Exception as e:
-            diag.append(f"TSETMC_MW_ERR:{type(e).__name__}")
-
-        try:
-            r3 = await client.get("https://webgw.tse.ir/InstrumentProvider/api/v1/Instrument/GetMarketWatch")
-            diag.append(f"WEBGW:{r3.status_code}")
-            if r3.status_code == 200:
-                rows = _unwrap_list(r3.json())
-                for x in rows:
-                    sym = str(x.get("lVal18AFC") or x.get("symbol") or "").strip()
-                    t_rial = _f(x.get("pClosing") or x.get("lastPrice"))
-                    y_rial = _f(x.get("priceYesterday")) or t_rial
-                    if sym and t_rial > 0:
-                        nm = str(x.get("lVal30") or sym).strip()
-                        items.append({
-                            "symbol": sym, "name": nm, "search_key": norm_fa(f"{sym} {nm}"),
-                            "market": "BOURSE", "ins_code": str(x.get("insCode") or x.get("InsCode") or x.get("instrumentCode") or ""),
-                            "today": round(t_rial / 10.0, 2), "yesterday": round(y_rial / 10.0, 2),
-                            "unit": "تومان", "pe": 0, "eps": 0, "tvol": _f(x.get("qTotTran5J"))
-                        })
-                if len(items) > 50:
-                    BOURSE_CACHE.update({"ts": now, "items": items, "source": f"LIVE_WEBGW ({len(items)} نماد)", "key_used": brs_key})
-                    return BOURSE_CACHE
-        except Exception as e:
-            diag.append(f"WEBGW_ERR:{type(e).__name__}")
+            diag.append(f"TSETMC_ERR:{type(e).__name__}")
 
     BOURSE_CACHE.update({"ts": now, "items": items, "source": " | ".join(diag), "key_used": brs_key})
     return BOURSE_CACHE
+
+def _clean_sort_candles(raw_candles: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    by_time = {}
+    for c in raw_candles:
+        if c["close"] > 0 and c["open"] > 0 and c["high"] >= c["low"]:
+            by_time[c["time"]] = c
+    return [by_time[k] for k in sorted(by_time.keys())]
 
 async def fetch_180_candles(symbol: str, market: str, item: Dict[str, Any], brs_key_override: str = "") -> Dict[str, Any]:
     brs_key = (brs_key_override or os.getenv("BRSAPI_KEY", "")).strip()
@@ -324,9 +313,7 @@ async def fetch_180_candles(symbol: str, market: str, item: Dict[str, Any], brs_
     if ckey in CANDLE_CACHE and (now - CANDLE_CACHE[ckey]["ts"] < 300):
         return CANDLE_CACHE[ckey]
 
-    candles = []
-    diag = []
-
+    candles, diag = [], []
     if market == "CRYPTO":
         async with httpx.AsyncClient(timeout=4.5) as client:
             try:
@@ -334,36 +321,35 @@ async def fetch_180_candles(symbol: str, market: str, item: Dict[str, Any], brs_
                 if r.status_code == 200 and isinstance(r.json(), list):
                     for k in r.json():
                         candles.append({
-                            "date": datetime.fromtimestamp(k[0] / 1000, tz=TEHRAN_TZ).strftime("%m-%d"),
+                            "time": int(k[0] / 1000),
                             "open": float(k[1]), "high": float(k[2]), "low": float(k[3]), "close": float(k[4]), "vol": float(k[5])
                         })
+                    candles = _clean_sort_candles(candles)
                     if candles:
                         res = {"ts": now, "source": "LIVE_BINANCE_1D", "candles": candles}
                         CANDLE_CACHE[ckey] = res
                         return res
-                diag.append(f"BINANCE:{r.status_code}")
             except Exception as e:
-                diag.append(f"BINANCE_ERR:{type(e).__name__}")
+                diag.append(f"BINANCE:{type(e).__name__}")
 
             try:
                 r2 = await client.get(f"https://api.kucoin.com/api/v1/market/candles?symbol={symbol.upper()}-USDT&type=1day")
                 if r2.status_code == 200:
-                    raw = (r2.json().get("data") or [])
-                    for k in reversed(raw[:180]):
+                    raw = (r2.json().get("data") or [])[:180]
+                    for k in raw:
                         candles.append({
-                            "date": datetime.fromtimestamp(int(k[0]), tz=TEHRAN_TZ).strftime("%m-%d"),
+                            "time": int(k[0]),
                             "open": float(k[1]), "close": float(k[2]), "high": float(k[3]), "low": float(k[4]), "vol": float(k[5])
                         })
+                    candles = _clean_sort_candles(candles)
                     if candles:
                         res = {"ts": now, "source": "LIVE_KUCOIN_1D", "candles": candles}
                         CANDLE_CACHE[ckey] = res
                         return res
-                diag.append(f"KUCOIN:{r2.status_code}")
             except Exception as e:
-                diag.append(f"KUCOIN_ERR:{type(e).__name__}")
+                diag.append(f"KUCOIN:{type(e).__name__}")
 
     elif market == "BOURSE":
-        # ۱) تلاش از طریق Api.BrsApi.ir با پارامتر استاندارد و پارس کامل JSON
         if brs_key:
             try:
                 async with httpx.AsyncClient(timeout=7.0, headers=BRSAPI_HEADERS) as client:
@@ -371,86 +357,60 @@ async def fetch_180_candles(symbol: str, market: str, item: Dict[str, Any], brs_
                     diag.append(f"BRS_HIST:{rh.status_code}")
                     if rh.status_code == 200:
                         rows = _unwrap_list(rh.json())
-                        if len(rows) >= 2:
-                            d0 = str(rows[0].get("date") or rows[0].get("dEven") or "")
-                            d1 = str(rows[-1].get("date") or rows[-1].get("dEven") or "")
-                            if d0 > d1:
-                                rows = list(reversed(rows))
-                        for row in rows[-180:]:
+                        if len(rows) >= 2 and str(rows[0].get("date") or "") > str(rows[-1].get("date") or ""):
+                            rows = list(reversed(rows))
+                        rows = rows[-180:]
+                        base_ts = int((datetime.now(TEHRAN_TZ) - timedelta(days=len(rows))).timestamp())
+                        for idx, row in enumerate(rows):
                             c = _f(row.get("pc") or row.get("pl") or row.get("pClosing") or row.get("close")) / 10.0
                             if c > 0:
                                 o = (_f(row.get("pf") or row.get("priceFirst") or row.get("open")) / 10.0) or c
-                                h = (_f(row.get("pmax") or row.get("priceMax") or row.get("high")) / 10.0) or c
-                                l = (_f(row.get("pmin") or row.get("priceMin") or row.get("low")) / 10.0) or c
-                                candles.append({"date": str(row.get("date") or row.get("dEven") or ""), "open": o, "high": h, "low": l, "close": c, "vol": _f(row.get("tvol") or row.get("volume"))})
+                                h = (_f(row.get("pmax") or row.get("priceMax") or row.get("high")) / 10.0) or max(o, c)
+                                l = (_f(row.get("pmin") or row.get("priceMin") or row.get("low")) / 10.0) or min(o, c)
+                                candles.append({"time": base_ts + idx * 86400, "open": o, "high": max(h, o, c), "low": min(l, o, c), "close": c, "vol": _f(row.get("tvol"))})
+                        candles = _clean_sort_candles(candles)
                         if candles:
                             res = {"ts": now, "source": "LIVE_BRSAPI_1D", "candles": candles}
                             CANDLE_CACHE[ckey] = res
                             return res
-                        diag.append("BRS_HIST:EMPTY_LIST")
             except Exception as e:
-                diag.append(f"BRS_HIST_ERR:{type(e).__name__}")
+                diag.append(f"BRS_ERR:{type(e).__name__}")
         else:
             diag.append("BRS_KEY:EMPTY")
 
-        # ۲) تلاش مستقیم از TSETMC (Search -> GetChartData & GetClosingPriceDailyList)
         async with httpx.AsyncClient(timeout=5.0, headers=TSETMC_HEADERS) as client:
             ins_code = item.get("ins_code")
-            if not ins_code:
-                try:
-                    rs = await client.get(f"https://cdn.tsetmc.com/api/Instrument/GetInstrumentSearch/{symbol}")
-                    diag.append(f"TSE_SEARCH:{rs.status_code}")
-                    if rs.status_code == 200:
-                        hits = rs.json().get("instrumentSearch") or []
-                        exact = next((h for h in hits if norm_fa(h.get("lVal18AFC")) == norm_fa(symbol)), hits[0] if hits else None)
-                        if exact:
-                            ins_code = str(exact.get("insCode"))
-                except Exception as e:
-                    diag.append(f"TSE_SEARCH_ERR:{type(e).__name__}")
-
             if ins_code:
-                try:
-                    rc = await client.get(f"https://cdn.tsetmc.com/api/ClosingPrice/GetChartData/{ins_code}/D")
-                    diag.append(f"TSE_CHART:{rc.status_code}")
-                    if rc.status_code == 200:
-                        rows = rc.json().get("closingPriceChartData") or []
-                        for row in rows[-180:]:
-                            c = _f(row.get("pClosing")) / 10.0
-                            if c > 0:
-                                o = (_f(row.get("priceFirst")) / 10.0) or c
-                                h = (_f(row.get("priceMax")) / 10.0) or c
-                                l = (_f(row.get("priceMin")) / 10.0) or c
-                                d_str = str(row.get("dEven") or "")
-                                candles.append({"date": f"{d_str[4:6]}-{d_str[6:8]}" if len(d_str) == 8 else d_str, "open": o, "high": h, "low": l, "close": c, "vol": _f(row.get("qTotTran5J"))})
-                        if candles:
-                            res = {"ts": now, "source": "LIVE_TSETMC_CHART_1D", "candles": candles}
-                            CANDLE_CACHE[ckey] = res
-                            return res
-                except Exception as e:
-                    diag.append(f"TSE_CHART_ERR:{type(e).__name__}")
-
                 try:
                     rh = await client.get(f"https://cdn.tsetmc.com/api/ClosingPrice/GetClosingPriceDailyList/{ins_code}/180")
                     diag.append(f"TSE_DAILY:{rh.status_code}")
                     if rh.status_code == 200:
-                        rows = rh.json().get("closingPriceDaily") or []
-                        for row in reversed(rows):
+                        rows = list(reversed(rh.json().get("closingPriceDaily") or []))
+                        for idx, row in enumerate(rows):
                             c = _f(row.get("pClosing")) / 10.0
                             if c > 0:
-                                o = (_f(row.get("priceFirst")) / 10.0) or c
-                                h = (_f(row.get("priceMax")) / 10.0) or c
-                                l = (_f(row.get("priceMin")) / 10.0) or c
                                 d_str = str(row.get("dEven") or "")
-                                candles.append({"date": f"{d_str[4:6]}-{d_str[6:8]}" if len(d_str) == 8 else d_str, "open": o, "high": h, "low": l, "close": c, "vol": _f(row.get("qTotTran5J"))})
+                                try:
+                                    ts = int(datetime.strptime(d_str, "%Y%m%d").replace(tzinfo=TEHRAN_TZ).timestamp())
+                                except Exception:
+                                    ts = int(time.time()) - (len(rows) - idx) * 86400
+                                o = (_f(row.get("priceFirst")) / 10.0) or c
+                                h = (_f(row.get("priceMax")) / 10.0) or max(o, c)
+                                l = (_f(row.get("priceMin")) / 10.0) or min(o, c)
+                                candles.append({"time": ts, "open": o, "high": max(h, o, c), "low": min(l, o, c), "close": c, "vol": _f(row.get("qTotTran5J"))})
+                        candles = _clean_sort_candles(candles)
                         if candles:
-                            res = {"ts": now, "source": "LIVE_TSETMC_DAILY_1D", "candles": candles}
+                            res = {"ts": now, "source": "LIVE_TSETMC_1D", "candles": candles}
                             CANDLE_CACHE[ckey] = res
                             return res
                 except Exception as e:
-                    diag.append(f"TSE_DAILY_ERR:{type(e).__name__}")
+                    diag.append(f"TSE_ERR:{type(e).__name__}")
 
     return {"ts": now, "source": " | ".join(diag) or "NO_DATA", "candles": []}
 
+# ==========================================
+# محاسبات کامل اندیکاتورها و پرایس اکشن برای رسم روی چارت
+# ==========================================
 def calc_ema(vals: List[float], period: int) -> List[float]:
     k = 2.0 / (period + 1)
     out = [vals[0]]
@@ -471,40 +431,92 @@ def calc_rsi(closes: List[float], period: int = 14) -> List[float]:
         rsis.append(100.0 if (al == 0 and ag > 0) else (50.0 if al == 0 else round(100.0 - (100.0 / (1.0 + ag / al)), 2)))
     return rsis
 
+def calc_bollinger(closes: List[float], period: int = 20, mult: float = 2.0):
+    upper, lower = [], []
+    for i in range(len(closes)):
+        win = closes[max(0, i - period + 1):i + 1]
+        mean = sum(win) / len(win)
+        var = sum((x - mean) ** 2 for x in win) / len(win)
+        sd = math.sqrt(var)
+        upper.append(round(mean + mult * sd, 6))
+        lower.append(round(mean - mult * sd, 6))
+    return upper, lower
+
+def detect_price_action(candles: List[Dict[str, Any]]):
+    markers = []
+    n = len(candles)
+    last_pivot_h, last_pivot_l = None, None
+    support_levels, resistance_levels = [], []
+
+    for i in range(2, n - 2):
+        h, l = candles[i]["high"], candles[i]["low"]
+        # پیوت سقف (HH / LH)
+        if h > candles[i-1]["high"] and h > candles[i-2]["high"] and h > candles[i+1]["high"] and h > candles[i+2]["high"]:
+            lbl = "HH" if (last_pivot_h is None or h > last_pivot_h) else "LH"
+            last_pivot_h = h
+            resistance_levels.append(h)
+            markers.append({"time": candles[i]["time"], "position": "aboveBar", "color": "#fbbf24", "shape": "circle", "text": lbl})
+        # پیوت کف (HL / LL)
+        if l < candles[i-1]["low"] and l < candles[i-2]["low"] and l < candles[i+1]["low"] and l < candles[i+2]["low"]:
+            lbl = "HL" if (last_pivot_l is None or l > last_pivot_l) else "LL"
+            last_pivot_l = l
+            support_levels.append(l)
+            markers.append({"time": candles[i]["time"], "position": "belowBar", "color": "#38bdf8", "shape": "circle", "text": lbl})
+
+    # الگوهای کندلی پین‌بار و اینگالفینگ
+    for i in range(1, n):
+        c = candles[i]
+        p = candles[i - 1]
+        body = abs(c["close"] - c["open"])
+        rng = max(c["high"] - c["low"], 1e-12)
+        up_w = c["high"] - max(c["open"], c["close"])
+        lo_w = min(c["open"], c["close"]) - c["low"]
+
+        if lo_w > body * 2.1 and up_w < rng * 0.25 and body > 0:
+            markers.append({"time": c["time"], "position": "belowBar", "color": "#10b981", "shape": "arrowUp", "text": "Pin+"})
+        elif up_w > body * 2.1 and lo_w < rng * 0.25 and body > 0:
+            markers.append({"time": c["time"], "position": "aboveBar", "color": "#ef4444", "shape": "arrowDown", "text": "Pin-"})
+        elif c["close"] > c["open"] and p["close"] < p["open"] and c["close"] > p["open"] and c["open"] <= p["close"]:
+            markers.append({"time": c["time"], "position": "belowBar", "color": "#22c55e", "shape": "arrowUp", "text": "Eng+"})
+        elif c["close"] < c["open"] and p["close"] > p["open"] and c["close"] < p["open"] and c["open"] >= p["close"]:
+            markers.append({"time": c["time"], "position": "aboveBar", "color": "#f43f5e", "shape": "arrowDown", "text": "Eng-"})
+
+    markers.sort(key=lambda m: m["time"])
+    major_sup = round(support_levels[-1], 6) if support_levels else round(min(x["low"] for x in candles[-30:]), 6)
+    major_res = round(resistance_levels[-1], 6) if resistance_levels else round(max(x["high"] for x in candles[-30:]), 6)
+    return markers[-35:], major_sup, major_res
+
 def analyze_full(symbol: str, market: str, item: Dict[str, Any], candles: List[Dict[str, Any]]):
     n = len(candles)
     closes = [c["close"] for c in candles]
     highs = [c["high"] for c in candles]
     lows = [c["low"] for c in candles]
-    price = closes[-1] if closes else float(item.get("today") or 0)
+    price = closes[-1]
 
     rets = [abs(closes[i] - closes[i - 1]) / closes[i - 1] for i in range(1, len(closes)) if closes[i - 1] > 0]
     daily_vol = max(min((sum(rets[-20:]) / len(rets[-20:])) if rets else 0.02, 0.08), 0.01)
 
-    rsi_s = calc_rsi(closes, 14) if n >= 2 else [50.0]
+    rsi_s = calc_rsi(closes, 14)
     rsi_now = rsi_s[-1]
-    ema12 = calc_ema(closes, 12) if n >= 2 else [price]
-    ema26 = calc_ema(closes, 26) if n >= 2 else [price]
+    ema12, ema26 = calc_ema(closes, 12), calc_ema(closes, 26)
+    ema20 = [round(x, 6) for x in calc_ema(closes, 20)]
+    ema50 = [round(x, 6) for x in calc_ema(closes, 50)]
+    bb_up, bb_lo = calc_bollinger(closes, 20, 2.0)
+
     macd_l = [round(a - b, 6) for a, b in zip(ema12, ema26)]
     sig_l = [round(x, 6) for x in calc_ema(macd_l, 9)]
     hist_l = [round(m - s, 6) for m, s in zip(macd_l, sig_l)]
 
-    sh, sl = (max(highs[-120:]) if highs else price), (min(lows[-120:]) if lows else price)
+    sh, sl = max(highs[-120:]), min(lows[-120:])
     diff = sh - sl
     fib = {
-        "0.0": round(sh, 6), "0.236": round(sh - 0.236 * diff, 6),
+        "0.0 (سقف)": round(sh, 6), "0.236": round(sh - 0.236 * diff, 6),
         "0.382": round(sh - 0.382 * diff, 6), "0.500": round(sh - 0.500 * diff, 6),
-        "0.618": round(sh - 0.618 * diff, 6), "1.0": round(sl, 6),
+        "0.618 (طلایی)": round(sh - 0.618 * diff, 6), "1.0 (کف)": round(sl, 6),
     }
 
-    sma20 = sum(closes[-20:]) / len(closes[-20:]) if closes else price
-    sma50 = sum(closes[-50:]) / len(closes[-50:]) if closes else price
-    if price > sma20 > sma50:
-        structure = "روند صعودی قدرتمند (بالای میانگین ۲۰ و ۵۰ روزه)"
-    elif price < sma20 < sma50:
-        structure = "روند نزولی (زیر میانگین‌ها)"
-    else:
-        structure = "رنج / نوسانی در محدوده تغییر روند"
+    pa_markers, pa_sup, pa_res = detect_price_action(candles)
+    structure = "روند صعودی (بالای EMA20 و EMA50)" if price > ema20[-1] > ema50[-1] else ("روند نزولی (زیر EMA20 و EMA50)" if price < ema20[-1] < ema50[-1] else "فاز رنج / تغییر روند")
 
     fee_pct = 1.25 if market == "BOURSE" else 0.20
     contracts = {}
@@ -528,9 +540,9 @@ def analyze_full(symbol: str, market: str, item: Dict[str, Any], candles: List[D
                 act = "سیو سود / انتظار اصلاح (اشباع خرید)"
             elif rsi_now <= 32 and price <= fib["0.500"]:
                 act = "پیشنهاد خرید پله‌ای روی حمایت"
-            elif macd_l[-1] > sig_l[-1] and price > sma20 and rr >= 1.5:
+            elif macd_l[-1] > sig_l[-1] and price > ema20[-1] and rr >= 1.5:
                 act = "پیشنهاد خرید / نگهداری صعودی"
-            elif price < sma20 and macd_l[-1] < sig_l[-1]:
+            elif price < ema20[-1] and macd_l[-1] < sig_l[-1]:
                 act = "پیشنهاد فروش / دوری از معامله"
             else:
                 act = "نوسان‌گیری بین حمایت و مقاومت"
@@ -543,35 +555,52 @@ def analyze_full(symbol: str, market: str, item: Dict[str, Any], candles: List[D
             }
 
     if rsi_now >= 70:
-        mood, advice = f"طمع شدید (RSI={rsi_now})", "جو خرید هیجانی؛ خرید روی قله پرریسک است، منتظر پولبک بمانید."
+        mood, advice = f"طمع شدید (RSI={rsi_now})", "خرید روی قله پرریسک است؛ منتظر اصلاح یا پولبک بمانید."
     elif rsi_now <= 32:
-        mood, advice = f"ترس شدید (RSI={rsi_now})", "فروش هیجانی در کف؛ ورود پله‌ای فقط با تایید کندل سبز و حد ضرر."
+        mood, advice = f"ترس شدید (RSI={rsi_now})", "فروش هیجانی در کف؛ فقط با تایید کندل پین‌بار/اینگالف سبز ورود پله‌ای انجام دهید."
     else:
-        mood, advice = f"تعادل روانی (RSI={rsi_now})", "بازار متعادل است؛ مطابق حد سود و حد ضرر تصمیم بگیرید."
+        mood, advice = f"تعادل روانی (RSI={rsi_now})", "بازار متعادل است؛ بر اساس خطوط حمایت و مقاومت چارت تصمیم بگیرید."
 
     pe, eps = float(item.get("pe") or 0), float(item.get("eps") or 0)
     if market == "BOURSE":
-        fund = f"P/E={pe or 'نامشخص'} | EPS={eps or 'نامشخص'} | وضعیت: {'ارزنده' if (eps > 0 and 0 < pe < 8) else ('زیان‌ده' if eps < 0 else 'بررسی گزارش کدال')}"
+        fund = f"P/E={pe or 'نامشخص'} | EPS={eps or 'نامشخص'} | وضعیت: {'ارزنده' if (eps > 0 and 0 < pe < 8) else ('زیان‌ده' if eps < 0 else 'نیازمند بررسی کدال')}"
     else:
         qv = float(item.get("quote_vol") or 0)
-        fund = f"حجم معاملات ۲۴ ساعته: {round(qv/1e6, 2)} میلیون دلار | نقدشوندگی: {'عالی' if qv > 1e7 else 'متوسط'}"
+        fund = f"حجم ۲۴ ساعته: {round(qv/1e6, 2)} میلیون دلار | نقدشوندگی: {'عالی' if qv > 1e7 else 'متوسط'}"
 
     strategies = {
-        "past": f"گذشته: نوسان بین کف {fib['1.0']} و سقف {fib['0.0']}؛ بهترین خریدها نزدیک ۰.۶۱۸ ({fib['0.618']}) بوده است.",
-        "present": f"حال: قیمت {price} ({structure}). حمایت کلیدی {fib['0.618']} و مقاومت {fib['0.236']}.",
-        "future": f"آینده: عبور قطعی از {fib['0.236']} هدف {fib['0.0']} را باز می‌کند؛ شکست {fib['0.618']} نیاز به خروج فوری دارد."
+        "past": f"گذشته: نوسان بین کف {fib['1.0 (کف)']} و سقف {fib['0.0 (سقف)']}؛ بهترین ورودها روی تراز ۰.۶۱۸ ({fib['0.618 (طلایی)']}) بوده است.",
+        "present": f"حال: {structure}. حمایت پرایس اکشن: {pa_sup} | مقاومت پرایس اکشن: {pa_res}.",
+        "future": f"آینده: شکست پرقدرت بالای {pa_res} موج صعودی جدید می‌سازد؛ از دست رفتن حمایت {pa_sup} هشدار خروج است."
+    }
+
+    # خروجی سری‌های کامل برای رسم روی Lightweight Charts
+    chart_payload = {
+        "candles": [{"time": c["time"], "open": c["open"], "high": c["high"], "low": c["low"], "close": c["close"]} for c in candles],
+        "volume": [{"time": c["time"], "value": c["vol"], "color": "rgba(16,185,129,0.35)" if c["close"] >= c["open"] else "rgba(239,68,68,0.35)"} for c in candles],
+        "ema20": [{"time": candles[i]["time"], "value": ema20[i]} for i in range(n)],
+        "ema50": [{"time": candles[i]["time"], "value": ema50[i]} for i in range(n)],
+        "bb_upper": [{"time": candles[i]["time"], "value": bb_up[i]} for i in range(n)],
+        "bb_lower": [{"time": candles[i]["time"], "value": bb_lo[i]} for i in range(n)],
+        "rsi": [{"time": candles[i]["time"], "value": rsi_s[i]} for i in range(n)],
+        "macd": [{"time": candles[i]["time"], "value": macd_l[i]} for i in range(n)],
+        "macd_signal": [{"time": candles[i]["time"], "value": sig_l[i]} for i in range(n)],
+        "macd_hist": [{"time": candles[i]["time"], "value": hist_l[i], "color": "#10b981" if hist_l[i] >= 0 else "#ef4444"} for i in range(n)],
+        "pa_markers": pa_markers,
+        "pa_support": pa_sup,
+        "pa_resistance": pa_res,
+        "fib": fib,
+        "rsi_now": rsi_now,
+        "structure": structure,
     }
 
     return {
         "price": price,
-        "technical": {
-            "dates": [c["date"] for c in candles[-60:]], "closes": closes[-60:],
-            "rsi_now": rsi_now, "rsi_series": rsi_s[-60:],
-            "macd_series": macd_l[-60:], "signal_series": sig_l[-60:], "hist_series": hist_l[-60:],
-            "fib": fib, "structure": structure,
-        },
-        "fundamental": fund, "psychology": {"mood": mood, "advice": advice},
-        "strategies": strategies, "contracts": contracts,
+        "chart": chart_payload,
+        "fundamental": fund,
+        "psychology": {"mood": mood, "advice": advice},
+        "strategies": strategies,
+        "contracts": contracts,
     }
 
 @app.get("/api/system-status")
@@ -583,35 +612,21 @@ async def system_status(brs_key: str = ""):
         "bourse_count": len(b_data["items"]), "bourse_source": b_data["source"],
     }
 
-@app.get("/api/debug-bourse")
-async def debug_bourse(symbol: str = "فولاد", brs_key: str = ""):
-    b_data = await load_all_bourse(brs_key, force=True)
-    item = next((x for x in b_data["items"] if norm_fa(x["symbol"]) == norm_fa(symbol)), {})
-    c_res = await fetch_180_candles(symbol, "BOURSE", item, brs_key)
-    return {
-        "bourse_count": len(b_data["items"]), "bourse_source": b_data["source"],
-        "symbol_found": bool(item), "ins_code": item.get("ins_code"),
-        "candle_source": c_res["source"], "candles_count": len(c_res["candles"])
-    }
-
 @app.get("/api/search")
 async def instant_search(q: str = "", brs_key: str = ""):
     q_norm = norm_fa(q)
     c_data, b_data = await asyncio.gather(load_all_crypto(), load_all_bourse(brs_key))
     results = []
-
     for it in b_data["items"]:
         if not q_norm or q_norm in it["search_key"]:
             results.append({"symbol": it["symbol"], "name": it["name"], "market": "BOURSE", "today": it["today"], "unit": "تومان"})
             if len(results) >= 15:
                 break
-
     for it in c_data["items"]:
         if not q_norm or q_norm in it["search_key"]:
             results.append({"symbol": it["symbol"], "name": it["name"], "market": "CRYPTO", "today": it["today"], "unit": "دلار"})
             if len(results) >= 30:
                 break
-
     return {"query": q, "results": results}
 
 @app.get("/api/analyze")
@@ -655,12 +670,7 @@ async def top5_scanner():
     c_data = await load_all_crypto()
     candidates = [x for x in c_data["items"] if x["today"] > 0][:14]
     candle_results = await asyncio.gather(*[fetch_180_candles(x["symbol"], "CRYPTO", x) for x in candidates])
-
-    analyzed = []
-    for item, cres in zip(candidates, candle_results):
-        if len(cres["candles"]) >= 10:
-            analyzed.append((item, analyze_full(item["symbol"], "CRYPTO", item, cres["candles"])))
-
+    analyzed = [(it, analyze_full(it["symbol"], "CRYPTO", it, cr["candles"])) for it, cr in zip(candidates, candle_results) if len(cr["candles"]) >= 10]
     top5 = {}
     for hk in HORIZON_SPECS:
         valid = [(it, a["contracts"][hk]) for it, a in analyzed if a["contracts"][hk]["evaluatable"] and ("خرید" in a["contracts"][hk]["action"] or "نگهداری" in a["contracts"][hk]["action"])]
