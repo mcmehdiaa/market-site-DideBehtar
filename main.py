@@ -29,7 +29,7 @@ BRSAPI_HEADERS = {
     "Accept": "application/json, text/plain, */*",
 }
 
-app = FastAPI(title="نسخه اصلاح‌شده - رفع باگ تتر و کش سرعت")
+app = FastAPI(title="نسخه اصلاح‌شده - تتر، ۵ منبع نرخ و کش سرعت")
 
 def norm_fa(text: str) -> str:
     if not text:
@@ -108,7 +108,7 @@ def parse_candle_timestamp(raw_date) -> Optional[int]:
     return None
 
 CRYPTO_FA_NAMES = {
-    "BTC": "بیت کوین بیتکوین", "ETH": "اتریوم اتريوم", "SOL": "سولانا سول",
+    "USDT": "تتر دلار دیجیتال", "BTC": "بیت کوین بیتکوین", "ETH": "اتریوم اتريوم", "SOL": "سولانا سول",
     "BNB": "بایننس کوین بی ان بی", "XRP": "ریپل", "ADA": "کاردانو آدا",
     "DOGE": "دوج کوین دوج", "TRX": "ترون", "TON": "تون کوین تون",
     "AVAX": "آوالانچ اولانچ", "SHIB": "شیبا اینو شیبا", "PEPE": "پپه",
@@ -137,7 +137,7 @@ CRYPTO_FA_NAMES = {
     "NEIRO": "نیرو", "TURBO": "توربو", "POPCAT": "پاپ کت",
     "PNUT": "پینات", "USUAL": "یوژوال", "MOVE": "موو", "KAITO": "کایتو",
     "FTM": "فانتوم", "S": "سونیک", "CHZ": "چیلیز", "APE": "ایپ کوین",
-    "USDT": "تتر دلار دیجیتال", "USDC": "یو اس دی کوین"
+    "USDC": "یو اس دی کوین"
 }
 
 def get_conn():
@@ -176,9 +176,6 @@ def enrich_comparison(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         out.append({**it, "diff": round(t - y_val, 6), "change_pct": round(pct, 2)})
     return out
 
-# ==========================================
-# ۱. دریافت موازی و بدون سکوت خطا برای نرخ تتر، ارزها و ترس/طمع
-# ==========================================
 async def _probe_usdt_toman(brs_key: str) -> Tuple[Optional[float], str]:
     diag = []
     async with httpx.AsyncClient(timeout=3.5, headers=BRSAPI_HEADERS) as client:
@@ -299,9 +296,15 @@ async def load_macro_live(brs_key_override: str = "", force: bool = False):
     })
     return MACRO_CACHE
 
-async def load_all_crypto(force: bool = False):
+async def load_all_crypto(force: bool = False, usdt_toman: Optional[float] = None):
     now = time.time()
     if not force and CRYPTO_CACHE["items"] and (now - CRYPTO_CACHE["ts"] < 60):
+        # بروزرسانی قیمت تتر در کش در صورت دریافت نرخ جدید
+        if usdt_toman:
+            for it in CRYPTO_CACHE["items"]:
+                if it["symbol"] == "USDT":
+                    it["today"] = usdt_toman
+                    it["yesterday"] = usdt_toman
         return CRYPTO_CACHE
 
     merged: Dict[str, Dict[str, Any]] = {}
@@ -354,15 +357,21 @@ async def load_all_crypto(force: bool = False):
                         "today": last_p, "yesterday": round(yest, 8), "unit": "دلار", "quote_vol": qvol
                     }
 
-    if merged:
-        items = sorted(merged.values(), key=lambda x: x["quote_vol"], reverse=True)
-        CRYPTO_CACHE.update({"ts": now, "items": items, "source": "+".join(sources_used)})
+    # افزودن خود «تتر (USDT)» با نام فارسی به فهرست رمزارزها تا جست‌وجوی «تتر» کار کند
+    fa_usdt = CRYPTO_FA_NAMES["USDT"]
+    merged["USDT"] = {
+        "symbol": "USDT", "fa_name": fa_usdt, "name": "تتر (دلار دیجیتال) - USDT/IRT",
+        "search_key": norm_fa(f"USDT {fa_usdt}"), "market": "CRYPTO",
+        "today": usdt_toman, "yesterday": usdt_toman, "unit": "تومان", "quote_vol": 1e9
+    }
+
+    items = sorted(merged.values(), key=lambda x: x["quote_vol"], reverse=True)
+    CRYPTO_CACHE.update({"ts": now, "items": items, "source": "+".join(sources_used) or "NO_CRYPTO_SRC"})
     return CRYPTO_CACHE
 
 async def load_all_bourse(brs_key_override: str = "", force: bool = False):
     brs_key = (brs_key_override or os.getenv("BRSAPI_KEY", "")).strip()
     now = time.time()
-    # اصلاح باگ سرعت ۴.۵ ثانیه‌ای: اگر قبلاً چک شده (حتی اگر خالی باشد)، تا ۱۲۰ ثانیه دوباره معطل timeout نشو
     if not force and BOURSE_CACHE["ts"] > 0 and (now - BOURSE_CACHE["ts"] < 120) and BOURSE_CACHE["key_used"] == brs_key:
         return BOURSE_CACHE
 
@@ -394,7 +403,6 @@ async def load_all_bourse(brs_key_override: str = "", force: bool = False):
     else:
         diag.append("BRS_KEY:EMPTY")
 
-    # کاهش timeout مستقیم به ۲ ثانیه تا هیچ‌گاه باعث کندی ۴.۵ ثانیه‌ای سایت نشود
     async with httpx.AsyncClient(timeout=2.0, headers=TSETMC_HEADERS) as client:
         try:
             pt = "&".join(f"paperTypes%5B{i}%5D={i+1}" for i in range(9))
@@ -438,7 +446,42 @@ async def fetch_180_candles(symbol: str, market: str, item: Dict[str, Any], brs_
         return CANDLE_CACHE[ckey]
 
     candles, diag = [], []
-    if market == "CRYPTO":
+    if market == "CRYPTO" and symbol.upper() == "USDT":
+        # کندل ۱۸۰ روزه واقعی تتر به تومان از نوبیتکس یا والکس
+        to_ts = int(now)
+        from_ts = to_ts - 185 * 86400
+        async with httpx.AsyncClient(timeout=4.0, headers=BRSAPI_HEADERS) as client:
+            try:
+                r = await client.get(f"https://apiv2.nobitex.ir/market/udf/history?symbol=USDTIRT&resolution=D&from={from_ts}&to={to_ts}")
+                if r.status_code == 200 and r.json().get("s") == "ok":
+                    d = r.json()
+                    for t, o, h, l, c, v in zip(d.get("t", []), d.get("o", []), d.get("h", []), d.get("l", []), d.get("c", []), d.get("v", [])):
+                        candles.append({"time": int(t), "open": float(o)/10.0, "high": float(h)/10.0, "low": float(l)/10.0, "close": float(c)/10.0, "vol": float(v)})
+                    candles = _clean_sort_candles(candles)[-180:]
+                    if candles:
+                        res = {"ts": now, "source": "LIVE_NOBITEX_USDTIRT_1D", "candles": candles}
+                        CANDLE_CACHE[ckey] = res
+                        return res
+                diag.append(f"NOBITEX_UDF:{r.status_code}")
+            except Exception as e:
+                diag.append(f"NOBITEX_UDF:{type(e).__name__}")
+
+            try:
+                r2 = await client.get(f"https://api.wallex.ir/v1/udf/history?symbol=USDTTMN&resolution=D&from={from_ts}&to={to_ts}")
+                if r2.status_code == 200 and r2.json().get("s") == "ok":
+                    d = r2.json()
+                    for t, o, h, l, c, v in zip(d.get("t", []), d.get("o", []), d.get("h", []), d.get("l", []), d.get("c", []), d.get("v", [])):
+                        candles.append({"time": int(t), "open": float(o), "high": float(h), "low": float(l), "close": float(c), "vol": float(v)})
+                    candles = _clean_sort_candles(candles)[-180:]
+                    if candles:
+                        res = {"ts": now, "source": "LIVE_WALLEX_USDTTMN_1D", "candles": candles}
+                        CANDLE_CACHE[ckey] = res
+                        return res
+                diag.append(f"WALLEX_UDF:{r2.status_code}")
+            except Exception as e:
+                diag.append(f"WALLEX_UDF:{type(e).__name__}")
+
+    elif market == "CRYPTO":
         async with httpx.AsyncClient(timeout=4.0) as client:
             try:
                 r = await client.get(f"https://data-api.binance.vision/api/v3/klines?symbol={symbol.upper()}USDT&interval=1d&limit=180")
@@ -647,10 +690,7 @@ def analyze_full(symbol: str, market: str, item: Dict[str, Any], candles: List[D
         else:
             atr_tp = price * (1.0 + min(daily_vol * spec["vol_scale"] * 1.45, 0.65))
             atr_sl = price * (1.0 - min(daily_vol * spec["vol_scale"] * 0.72, 0.28))
-            if hk in ("H1_DAILY", "H2_WEEKLY") and 0 < pa_sup < price:
-                sl_v = round(max(atr_sl, pa_sup * 0.992), 6)
-            else:
-                sl_v = round(atr_sl, 6)
+            sl_v = round(max(atr_sl, pa_sup * 0.992), 6) if (hk in ("H1_DAILY", "H2_WEEKLY") and 0 < pa_sup < price) else round(atr_sl, 6)
             tp = round(atr_tp, 6)
             net_ret = round(((tp - price) / price * 100.0) - fee_pct, 2)
             net_rsk = round(((price - sl_v) / price * 100.0) + fee_pct, 2)
@@ -742,7 +782,8 @@ async def run_self_test(brs_key: str = ""):
     gate_ok = all(not c["evaluatable"] and c["target"] is None and c["stop"] is None for c in short_res["contracts"].values())
     checks.append({"name": "Insufficient Data No-Fabrication Gate", "passed": gate_ok, "detail": "8 bars -> all 4 horizons locked to None"})
 
-    c_data, b_data, macro = await asyncio.gather(load_all_crypto(), load_all_bourse(brs_key), load_macro_live(brs_key, force=True))
+    macro, b_data = await asyncio.gather(load_macro_live(brs_key, force=True), load_all_bourse(brs_key))
+    c_data = await load_all_crypto(force=True, usdt_toman=macro["usdt_toman"])
     checks.append({"name": "Live Crypto Universe (>=300 coins)", "passed": len(c_data["items"]) >= 300, "detail": f"count={len(c_data['items'])}, src={c_data['source']}"})
     checks.append({"name": "Live USDT-Toman (5 Sources, no fake 70200)", "passed": macro["usdt_toman"] is not None, "detail": f"usdt={macro['usdt_toman']}, src={macro['usdt_source']}"})
     checks.append({"name": "Live Global FX Rates", "passed": len(macro["fx_rates"]) >= 10, "detail": f"src={macro['fx_source']}"})
@@ -752,7 +793,8 @@ async def run_self_test(brs_key: str = ""):
 
 @app.get("/api/system-status")
 async def system_status(brs_key: str = ""):
-    c_data, b_data, macro = await asyncio.gather(load_all_crypto(), load_all_bourse(brs_key), load_macro_live(brs_key))
+    macro, b_data = await asyncio.gather(load_macro_live(brs_key), load_all_bourse(brs_key))
+    c_data = await load_all_crypto(usdt_toman=macro["usdt_toman"])
     return {
         "timestamp_tehran": datetime.now(TEHRAN_TZ).strftime("%Y-%m-%d %H:%M"),
         "crypto_count": len(c_data["items"]), "crypto_source": c_data["source"],
@@ -763,7 +805,8 @@ async def system_status(brs_key: str = ""):
 @app.get("/api/search")
 async def instant_search(q: str = "", brs_key: str = ""):
     q_norm = norm_fa(q)
-    c_data, b_data = await asyncio.gather(load_all_crypto(), load_all_bourse(brs_key))
+    macro, b_data = await asyncio.gather(load_macro_live(brs_key), load_all_bourse(brs_key))
+    c_data = await load_all_crypto(usdt_toman=macro["usdt_toman"])
     results = []
     for it in b_data["items"]:
         if not q_norm or q_norm in it["search_key"]:
@@ -772,7 +815,7 @@ async def instant_search(q: str = "", brs_key: str = ""):
                 break
     for it in c_data["items"]:
         if not q_norm or q_norm in it["search_key"]:
-            results.append({"symbol": it["symbol"], "name": it["name"], "market": "CRYPTO", "today": it["today"], "unit": "دلار"})
+            results.append({"symbol": it["symbol"], "name": it["name"], "market": "CRYPTO", "today": it["today"], "unit": it["unit"]})
             if len(results) >= 30:
                 break
     return {"query": q, "results": results}
@@ -782,7 +825,8 @@ async def analyze_endpoint(symbol: str, market: str = "AUTO", brs_key: str = "")
     t0 = time.time()
     q_norm = norm_fa(symbol)
     mkt_u = market.strip().upper()
-    c_data, b_data, macro = await asyncio.gather(load_all_crypto(), load_all_bourse(brs_key), load_macro_live(brs_key))
+    macro, b_data = await asyncio.gather(load_macro_live(brs_key), load_all_bourse(brs_key))
+    c_data = await load_all_crypto(usdt_toman=macro["usdt_toman"])
 
     item = None
     if mkt_u in ("AUTO", "BOURSE"):
@@ -816,7 +860,7 @@ async def analyze_endpoint(symbol: str, market: str = "AUTO", brs_key: str = "")
 @app.get("/api/top5-scanner")
 async def top5_scanner():
     c_data = await load_all_crypto()
-    candidates = [x for x in c_data["items"] if x["today"] > 0][:14]
+    candidates = [x for x in c_data["items"] if x.get("today") and x["symbol"] != "USDT"][:14]
     candle_results = await asyncio.gather(*[fetch_180_candles(x["symbol"], "CRYPTO", x) for x in candidates])
     analyzed = [(it, analyze_full(it["symbol"], "CRYPTO", it, cr["candles"])) for it, cr in zip(candidates, candle_results) if len(cr["candles"]) >= 16]
     top5 = {}
@@ -828,7 +872,8 @@ async def top5_scanner():
 
 @app.get("/api/watchlists")
 async def watchlists(brs_key: str = ""):
-    c_data, b_data, macro = await asyncio.gather(load_all_crypto(), load_all_bourse(brs_key), load_macro_live(brs_key))
+    macro, b_data = await asyncio.gather(load_macro_live(brs_key), load_all_bourse(brs_key))
+    c_data = await load_all_crypto(usdt_toman=macro["usdt_toman"])
     usdt_t, fx_rates = macro["usdt_toman"], macro["fx_rates"]
 
     fx_names = [("USD", "دلار آمریکا"), ("EUR", "یورو اروپا"), ("GBP", "پوند انگلیس"), ("AED", "درهم امارات"),
@@ -886,7 +931,8 @@ def del_pf(pid: int):
 
 @app.get("/api/portfolio")
 async def get_pf(brs_key: str = ""):
-    c_data, b_data, macro = await asyncio.gather(load_all_crypto(), load_all_bourse(brs_key), load_macro_live(brs_key))
+    macro, b_data = await asyncio.gather(load_macro_live(brs_key), load_all_bourse(brs_key))
+    c_data = await load_all_crypto(usdt_toman=macro["usdt_toman"])
     usdt_t = macro["usdt_toman"]
     conn = get_conn()
     rows = conn.execute("SELECT id, symbol, market, quantity, avg_buy_price_toman FROM portfolio").fetchall()
@@ -895,12 +941,13 @@ async def get_pf(brs_key: str = ""):
     for pid, sym, mkt, qty, buy_p in rows:
         pool = b_data["items"] if mkt == "BOURSE" else c_data["items"]
         m = next((x for x in pool if norm_fa(x["symbol"]) == norm_fa(sym)), None)
-        if not m:
+        if not m or m.get("today") is None:
             cur_p, pnl, sig = None, None, "نماد در منبع زنده یافت نشد"
-        elif mkt == "CRYPTO" and usdt_t is None:
+        elif mkt == "CRYPTO" and sym.upper() != "USDT" and usdt_t is None:
             cur_p, pnl, sig = None, None, "نرخ تتر زنده در دسترس نیست"
         else:
-            cur_p = float(m["today"]) * (usdt_t if mkt == "CRYPTO" else 1.0)
+            mult = 1.0 if (mkt == "BOURSE" or sym.upper() == "USDT") else usdt_t
+            cur_p = float(m["today"]) * mult
             pnl = ((cur_p - buy_p) / buy_p * 100.0) if buy_p > 0 else 0.0
             sig = "فروش (حد ضرر)" if pnl <= -6 else ("سیو سود" if pnl >= 15 else "نگهداری / پایش")
             cur_p, pnl = round(cur_p, 2), round(pnl, 2)
@@ -914,4 +961,4 @@ def home():
         return f.read()
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=int(os.getenv("PORT", 8000)))ل
+    uvicorn.run("main:app", host="0.0.0.0", port=int(os.getenv("PORT", 8000)))
