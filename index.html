@@ -3,308 +3,214 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>سایت تحلیل بازار، تکنیکال، بنیادی و روانشناسی</title>
+  <title>فاز ۱ - تحلیل کل بازار کریپتو و بورس (۴ بازه تا ۱۲۰ روزه)</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet" />
-  <style>
-    body { font-family: 'Vazirmatn', sans-serif; background: #090e1a; color: #e2e8f0; }
-    .card { background: #111827; border: 1px solid #1f2937; border-radius: 14px; }
-  </style>
+  <style>body{font-family:'Vazirmatn',sans-serif;background:#090e1a;color:#e2e8f0}.card{background:#111827;border:1px solid #1f2937;border-radius:14px}</style>
 </head>
 <body class="p-3 md:p-6 max-w-7xl mx-auto space-y-5">
 
-  <header class="card p-4 flex flex-col md:flex-row justify-between items-center gap-2">
+  <header class="card p-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
     <div>
-      <h1 class="text-xl md:text-2xl font-bold text-emerald-400">دستیار هوشمند بازار سرمایه و کریپتو</h1>
-      <p class="text-xs text-slate-400">پرایس اکشن، RSI، MACD، فیبوناچی | تحلیل بنیادی و روانشناسی | ۵ هوش مصنوعی</p>
+      <h1 class="text-xl font-bold text-emerald-400">سامانه جامع تحلیل کل بازار (فاز ۱)</h1>
+      <p class="text-xs text-slate-400">جست‌وجوی لحظه‌ای کل رمزارزها + بورس | ۴ بازه: روزانه، هفتگی، ماهانه، ۱۲۰ روزه</p>
     </div>
-    <div id="market-badge" class="text-xs bg-slate-800 px-3 py-1.5 rounded-lg text-slate-300">در حال دریافت...</div>
+    <div id="sys-badge" class="text-[11px] bg-slate-800 px-3 py-1.5 rounded-lg text-sky-300">در حال اتصال به کل بازار...</div>
   </header>
 
-  <!-- وضعیت امروز و فردا -->
-  <section class="grid grid-cols-1 md:grid-cols-3 gap-3">
-    <div class="card p-4">
-      <div class="text-xs text-slate-400">وضعیت بازار امروز</div>
-      <div id="today-status" class="text-lg font-bold text-sky-400 mt-1">-</div>
-      <div id="breadth-info" class="text-xs text-slate-400 mt-1"></div>
-    </div>
-    <div class="card p-4 md:col-span-2">
-      <div class="text-xs text-slate-400">چشم‌انداز و استراتژی فردا</div>
-      <div id="tomorrow-outlook" class="text-xs md:text-sm mt-2 leading-6 text-slate-200">-</div>
-    </div>
-  </section>
-
-  <!-- تحلیلگر جامع تک سهم + نمودارها + بنیادی + روانشناسی + استراتژی + ۵ هوش مصنوعی -->
+  <!-- جست‌وجوی زیر ۱ ثانیه -->
   <section class="card p-4 md:p-5 space-y-4">
-    <h2 class="text-base md:text-lg font-bold text-amber-400">تحلیلگر جامع سهم / رمزارز (نمودار، بنیادی، روانشناسی و استراتژی)</h2>
-    <div class="flex flex-wrap gap-2">
-      <input id="sym-input" type="text" value="فولاد" placeholder="نماد (فولاد، خودرو، ذوب، BTC، PEPE)" class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm flex-1 min-w-[180px]" />
-      <select id="mkt-select" class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm">
-        <option value="BOURSE">بورس ایران</option>
-        <option value="CRYPTO">ارز دیجیتال</option>
-      </select>
-      <button onclick="analyzeSymbol()" class="bg-emerald-600 hover:bg-emerald-500 px-5 py-2 rounded-lg text-sm font-bold">تحلیل کامل</button>
+    <h2 class="text-base font-bold text-amber-400">جست‌وجو و تحلیل فوری هر نماد (کل بازار کریپتو + بورس)</h2>
+    <div class="relative">
+      <div class="flex flex-wrap gap-2">
+        <input id="search-box" type="text" oninput="liveSearch()" placeholder="اسم یا نماد را تایپ کنید (مثلاً: BTC، SOL، SUI، NOT، PEPE، فولاد...)" class="bg-slate-900 border border-slate-700 rounded-lg px-4 py-2.5 text-sm flex-1 min-w-[220px]" value="BTC" />
+        <select id="mkt-select" class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm">
+          <option value="CRYPTO">کریپتو (کل کوین‌ها)</option>
+          <option value="BOURSE">بورس ایران</option>
+        </select>
+        <button onclick="runAnalyze()" class="bg-emerald-600 hover:bg-emerald-500 px-5 py-2 rounded-lg text-sm font-bold">تحلیل فوری</button>
+      </div>
+      <div id="autocomplete-list" class="hidden absolute z-30 w-full bg-slate-900 border border-slate-700 rounded-lg mt-1 max-h-60 overflow-y-auto shadow-2xl"></div>
     </div>
 
     <div id="analysis-area" class="space-y-4 hidden">
-      <!-- کارت‌های نمودار -->
+      <div id="speed-bar" class="text-xs bg-slate-900/90 border border-slate-800 px-3 py-2 rounded-lg flex flex-wrap justify-between gap-2"></div>
+
+      <!-- ۴ بازه پیشنهادی تا ۱۲۰ روزه -->
+      <div id="horizons-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3"></div>
+
+      <!-- نمودارها -->
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-3">
         <div class="bg-slate-900 p-3 rounded-xl border border-slate-800 lg:col-span-2">
-          <div class="text-xs text-slate-400 mb-1" id="chart-title">نمودار قیمت و سطوح فیبوناچی</div>
+          <div class="text-xs text-slate-400 mb-1" id="chart-title">نمودار قیمت + فیبوناچی</div>
           <canvas id="priceChart" height="140"></canvas>
         </div>
         <div class="bg-slate-900 p-3 rounded-xl border border-slate-800 space-y-2 text-xs">
-          <div class="font-bold text-sky-400 text-sm">پرایس اکشن و فیبوناچی</div>
-          <div id="pa-box" class="leading-6"></div>
-          <div id="fib-box" class="grid grid-cols-2 gap-1 pt-2 border-t border-slate-800"></div>
+          <div class="font-bold text-sky-400">پرایس اکشن، بنیادی و روانشناسی</div>
+          <div id="pa-info" class="leading-6"></div>
+          <div id="fund-info" class="pt-2 border-t border-slate-800 text-emerald-300 leading-6"></div>
+          <div id="psych-info" class="pt-2 border-t border-slate-800 text-purple-300 leading-6"></div>
         </div>
       </div>
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-        <div class="bg-slate-900 p-3 rounded-xl border border-slate-800">
-          <div class="text-xs text-slate-400 mb-1" id="rsi-title">شاخص RSI (۱۴)</div>
-          <canvas id="rsiChart" height="100"></canvas>
-        </div>
-        <div class="bg-slate-900 p-3 rounded-xl border border-slate-800">
-          <div class="text-xs text-slate-400 mb-1">اندیکاتور MACD و سیگنال</div>
-          <canvas id="macdChart" height="100"></canvas>
-        </div>
-      </div>
-
-      <!-- بنیادی و روانشناس بازار -->
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-        <div class="bg-slate-900 p-4 rounded-xl border border-emerald-900/50 space-y-1">
-          <div class="font-bold text-sm text-emerald-400">تحلیلگر بنیادی</div>
-          <div id="fund-verdict" class="font-bold text-slate-200"></div>
-          <div id="fund-detail" class="text-slate-300 leading-6"></div>
-        </div>
-        <div class="bg-slate-900 p-4 rounded-xl border border-purple-900/50 space-y-1">
-          <div class="font-bold text-sm text-purple-400">روانشناس بازار و رفتار معامله‌گران</div>
-          <div id="psych-mood" class="font-bold text-slate-200"></div>
-          <div id="psych-advice" class="text-slate-300 leading-6"></div>
-        </div>
+        <div class="bg-slate-900 p-3 rounded-xl border border-slate-800"><div class="text-xs text-slate-400 mb-1">RSI (14)</div><canvas id="rsiChart" height="90"></canvas></div>
+        <div class="bg-slate-900 p-3 rounded-xl border border-slate-800"><div class="text-xs text-slate-400 mb-1">MACD</div><canvas id="macdChart" height="90"></canvas></div>
       </div>
 
       <!-- استراتژی گذشته، حال، آینده -->
-      <div class="bg-slate-900 p-4 rounded-xl border border-amber-900/40 space-y-2 text-xs">
-        <div class="font-bold text-sm text-amber-400">نقشه استراتژی: گذشته، حال و آینده بازار</div>
-        <div id="strat-past" class="text-slate-300 leading-6"></div>
-        <div id="strat-present" class="text-emerald-300 leading-6"></div>
-        <div id="strat-future" class="text-sky-300 leading-6"></div>
+      <div class="bg-slate-900 p-3 rounded-xl border border-amber-900/40 text-xs space-y-1.5">
+        <div class="font-bold text-amber-400">استراتژی گذشته، حال و آینده:</div>
+        <div id="st-past"></div><div id="st-present" class="text-emerald-300"></div><div id="st-future" class="text-sky-300"></div>
       </div>
-
-      <!-- ۴ افق زمانی -->
-      <div id="horizons-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3"></div>
-
-      <!-- ۵ هوش مصنوعی -->
-      <div id="ai-grid" class="space-y-2"></div>
     </div>
   </section>
 
-  <!-- ۵ سهم برتر هر بازه -->
+  <!-- اسکنر برترین‌های ۴ بازه -->
   <section class="card p-4 space-y-3">
-    <h2 class="text-base font-bold text-sky-400">معرفی ۵ فرصت برتر در ۴ بازه زمانی</h2>
+    <h2 class="text-base font-bold text-sky-400">پیشنهاد هوشمند ۵ برتر از کل بازار در ۴ بازه (روزانه تا ۱۲۰ روزه)</h2>
     <div id="top5-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3"></div>
   </section>
 
   <!-- پرتفوی شخصی -->
   <section class="card p-4 space-y-3">
-    <h2 class="text-base font-bold text-purple-400">پرتفوی شخصی و سیگنال لحظه‌ای خرید / فروش</h2>
+    <h2 class="text-base font-bold text-purple-400">پرتفوی شخصی و سیگنال خرید/فروش</h2>
     <div class="grid grid-cols-1 sm:grid-cols-5 gap-2">
-      <input id="pf-sym" placeholder="نماد (فولاد / BTC)" class="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-xs" />
-      <select id="pf-mkt" class="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-xs"><option value="BOURSE">بورس</option><option value="CRYPTO">کریپتو</option></select>
+      <input id="pf-sym" placeholder="نماد (BTC / فولاد)" class="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-xs" />
+      <select id="pf-mkt" class="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-xs"><option value="CRYPTO">کریپتو</option><option value="BOURSE">بورس</option></select>
       <input id="pf-qty" type="number" step="any" placeholder="تعداد" class="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-xs" />
       <input id="pf-price" type="number" step="any" placeholder="قیمت خرید (تومان)" class="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-xs" />
-      <button onclick="addPortfolio()" class="bg-purple-600 rounded px-3 py-2 text-xs font-bold">افزودن</button>
+      <button onclick="addPf()" class="bg-purple-600 rounded px-3 py-2 text-xs font-bold">افزودن</button>
     </div>
-    <div class="overflow-x-auto">
-      <table class="w-full text-xs text-right">
-        <thead class="text-slate-400 border-b border-slate-800">
-          <tr><th class="py-2">نماد</th><th>بازار</th><th>تعداد</th><th>خرید</th><th>فعلی</th><th>سود/زیان</th><th>امروز</th><th>سیگنال</th><th>حذف</th></tr>
-        </thead>
-        <tbody id="portfolio-tbody"></tbody>
-      </table>
-    </div>
+    <div class="overflow-x-auto"><table class="w-full text-xs text-right"><thead class="text-slate-400 border-b border-slate-800"><tr><th class="py-2">نماد</th><th>بازار</th><th>تعداد</th><th>خرید</th><th>فعلی</th><th>سود/زیان</th><th>وضعیت</th><th>حذف</th></tr></thead><tbody id="pf-body"></tbody></table></div>
   </section>
 
-  <!-- تابلوی ۱۵تایی ۵ دسته -->
+  <!-- مقایسه امروز و دیروز در ۵ دسته -->
   <section class="card p-4 space-y-3">
-    <h2 class="text-base font-bold text-emerald-400">تابلوی قیمت و مقایسه امروز با دیروز (۱۵ نماد در هر دسته)</h2>
+    <h2 class="text-base font-bold text-emerald-400">مقایسه قیمت امروز و دیروز (۵ دسته × ۱۵ نماد برتر)</h2>
     <div class="flex flex-wrap gap-2">
-      <button onclick="switchTab('bourse')" class="tab-btn bg-emerald-600 px-3 py-1.5 rounded text-xs font-bold" data-tab="bourse">بورس ایران (۱۵)</button>
-      <button onclick="switchTab('crypto')" class="tab-btn bg-slate-800 px-3 py-1.5 rounded text-xs" data-tab="crypto">ارز دیجیتال (۱۵)</button>
-      <button onclick="switchTab('metals')" class="tab-btn bg-slate-800 px-3 py-1.5 rounded text-xs" data-tab="metals">فلزات و سکه (۱۵)</button>
-      <button onclick="switchTab('etfs')" class="tab-btn bg-slate-800 px-3 py-1.5 rounded text-xs" data-tab="etfs">صندوق بورسی (۱۵)</button>
-      <button onclick="switchTab('forex')" class="tab-btn bg-slate-800 px-3 py-1.5 rounded text-xs" data-tab="forex">ارز کشورها (۱۵)</button>
+      <button onclick="swTab('crypto')" class="tbtn bg-emerald-600 px-3 py-1 rounded text-xs font-bold" data-t="crypto">کریپتو</button>
+      <button onclick="swTab('bourse')" class="tbtn bg-slate-800 px-3 py-1 rounded text-xs" data-t="bourse">بورس</button>
+      <button onclick="swTab('metals')" class="tbtn bg-slate-800 px-3 py-1 rounded text-xs" data-t="metals">فلزات و سکه</button>
+      <button onclick="swTab('etfs')" class="tbtn bg-slate-800 px-3 py-1 rounded text-xs" data-t="etfs">صندوق‌ها</button>
+      <button onclick="swTab('forex')" class="tbtn bg-slate-800 px-3 py-1 rounded text-xs" data-t="forex">ارز کشورها</button>
     </div>
-    <div class="overflow-x-auto">
-      <table class="w-full text-xs text-right">
-        <thead class="text-slate-400 border-b border-slate-800">
-          <tr><th class="py-2">#</th><th>نماد / نام</th><th>قیمت دیروز</th><th>قیمت امروز</th><th>اختلاف</th><th>تغییر</th></tr>
-        </thead>
-        <tbody id="watchlist-tbody"></tbody>
-      </table>
-    </div>
+    <div class="overflow-x-auto"><table class="w-full text-xs text-right"><thead class="text-slate-400 border-b border-slate-800"><tr><th class="py-2">#</th><th>نماد</th><th>دیروز</th><th>امروز</th><th>تغییر</th></tr></thead><tbody id="wl-body"></tbody></table></div>
   </section>
 
 <script>
-let watchlistsCache = {}, activeTab = 'bourse';
-let pChart = null, rChart = null, mChart = null;
+let wl = {}, curTab = 'crypto', pC = null, rC = null, mC = null, searchTimer = null;
+const fmt = n => (n === null || n === undefined) ? '-' : Number(n).toLocaleString('fa-IR', {maximumFractionDigits: 6});
 
-function fmt(n) { return (n === null || n === undefined) ? '-' : Number(n).toLocaleString('fa-IR', { maximumFractionDigits: 6 }); }
-
-async function loadOverview() {
-  const d = await (await fetch('/api/market-overview')).json();
-  document.getElementById('today-status').innerText = d.today_status;
-  document.getElementById('breadth-info').innerText = `${d.bourse_breadth} | ${d.crypto_breadth}`;
-  document.getElementById('tomorrow-outlook').innerText = d.tomorrow_outlook;
-  document.getElementById('market-badge').innerText = `تهران ${d.timestamp_tehran} | ${d.crypto_source}`;
+async function loadSys() {
+  const s = await (await fetch('/api/system-status')).json();
+  document.getElementById('sys-badge').innerText = `کریپتو: ${s.crypto_count} رمزارز زنده (${s.crypto_source}) | بورس: ${s.bourse_count} نماد (${s.bourse_source})`;
 }
 
-async function loadWatchlists() {
-  watchlistsCache = await (await fetch('/api/watchlists')).json();
-  renderWatchlist(activeTab);
+async function liveSearch() {
+  clearTimeout(searchTimer);
+  const q = document.getElementById('search-box').value.trim();
+  const list = document.getElementById('autocomplete-list');
+  if (!q) { list.classList.add('hidden'); return; }
+  searchTimer = setTimeout(async () => {
+    const d = await (await fetch(`/api/search?q=${encodeURIComponent(q)}`)).json();
+    if (!d.results.length) { list.classList.add('hidden'); return; }
+    list.innerHTML = d.results.map(r => `
+      <div onclick="pickSymbol('${r.symbol}','${r.market}')" class="px-3 py-2 hover:bg-slate-800 cursor-pointer flex justify-between text-xs border-b border-slate-800/50">
+        <span><b>${r.symbol}</b> <span class="text-slate-400">${r.name}</span></span>
+        <span class="text-emerald-400">${fmt(r.today)} ${r.unit} (${r.market === 'CRYPTO' ? 'کریپتو' : 'بورس'})</span>
+      </div>`).join('');
+    list.classList.remove('hidden');
+  }, 120);
 }
 
-function switchTab(tab) {
-  activeTab = tab;
-  document.querySelectorAll('.tab-btn').forEach(b => {
-    b.className = b.dataset.tab === tab ? 'tab-btn bg-emerald-600 px-3 py-1.5 rounded text-xs font-bold' : 'tab-btn bg-slate-800 px-3 py-1.5 rounded text-xs';
-  });
-  renderWatchlist(tab);
+function pickSymbol(sym, mkt) {
+  document.getElementById('search-box').value = sym;
+  document.getElementById('mkt-select').value = mkt;
+  document.getElementById('autocomplete-list').classList.add('hidden');
+  runAnalyze();
 }
 
-function renderWatchlist(tab) {
-  const list = watchlistsCache[tab] || [];
-  document.getElementById('watchlist-tbody').innerHTML = list.map((it, i) => {
-    const c = it.change_pct > 0 ? 'text-emerald-400' : (it.change_pct < 0 ? 'text-rose-400' : 'text-slate-300');
-    const s = it.change_pct > 0 ? '+' : '';
-    return `<tr class="border-b border-slate-800/60">
-      <td class="py-2 text-slate-500">${i+1}</td>
-      <td class="font-bold">${it.symbol} <span class="font-normal text-slate-400">${it.name}${it.type ? ' ('+it.type+')' : ''}</span></td>
-      <td class="text-slate-400">${fmt(it.yesterday)} ${it.unit}</td>
-      <td class="font-bold">${fmt(it.today)} ${it.unit}</td>
-      <td class="${c}">${s}${fmt(it.diff)}</td>
-      <td class="${c} font-bold" dir="ltr">${s}${it.change_pct}%</td>
-    </tr>`;
-  }).join('');
-}
-
-async function analyzeSymbol() {
-  const sym = document.getElementById('sym-input').value;
+async function runAnalyze() {
+  document.getElementById('autocomplete-list').classList.add('hidden');
+  const sym = document.getElementById('search-box').value;
   const mkt = document.getElementById('mkt-select').value;
   const d = await (await fetch(`/api/analyze?symbol=${encodeURIComponent(sym)}&market=${mkt}`)).json();
   const area = document.getElementById('analysis-area');
   area.classList.remove('hidden');
 
   if (!d.found) {
-    document.getElementById('pa-box').innerHTML = '<span class="text-rose-400">نماد در لیست پایه یافت نشد؛ برای جلوگیری از عددسازی، تحلیل متوقف شد.</span>';
+    document.getElementById('speed-bar').innerHTML = `<span class="text-rose-400">نماد ${sym} در بازار یافت نشد (${d.elapsed_ms} میلی‌ثانیه).</span>`;
+    return;
+  }
+  if (d.no_candles) {
+    document.getElementById('speed-bar').innerHTML = `<span class="text-amber-400">نماد ${d.symbol} پیدا شد، اما دیتای تاریخچه ۱۸۰ روزه آن از سرور Vercel در دسترس نبود (${d.candle_source}).</span>`;
     return;
   }
 
-  const t = d.technical;
-  document.getElementById('chart-title').innerText = `نمودار قیمت ${d.contract.symbol} (${d.unit}) + ترازهای فیبوناچی (${d.candle_source})`;
-  document.getElementById('rsi-title').innerText = `شاخص RSI(14) — مقدار فعلی: ${t.rsi_now}`;
-  document.getElementById('pa-box').innerHTML = `<div><b>ساختار روند:</b> ${t.structure}</div><div><b>الگوی کندلی:</b> ${t.pa_pattern}</div><div><b>حمایت کلیدی:</b> ${fmt(t.support)} | <b>مقاومت:</b> ${fmt(t.resistance)}</div>`;
-  document.getElementById('fib-box').innerHTML = Object.entries(t.fib).map(([k, v]) => `<div class="bg-slate-800/70 px-2 py-1 rounded">فیبو ${k}: <b>${fmt(v)}</b></div>`).join('');
-
-  document.getElementById('fund-verdict').innerText = d.fundamental.verdict;
-  document.getElementById('fund-detail').innerText = d.fundamental.detail;
-  document.getElementById('psych-mood').innerText = `${d.psychology.mood} (شاخص طمع: ${d.psychology.greed_score}/100)`;
-  document.getElementById('psych-advice').innerText = d.psychology.advice;
-
-  document.getElementById('strat-past').innerText = '🔹 ' + d.strategies.past;
-  document.getElementById('strat-present').innerText = '🔸 ' + d.strategies.present;
-  document.getElementById('strat-future').innerText = '🔺 ' + d.strategies.future;
-
-  document.getElementById('horizons-grid').innerHTML = Object.values(d.contract.contracts).map(h => {
+  document.getElementById('speed-bar').innerHTML = `<span>نماد: <b>${d.symbol}</b> | قیمت: <b>${fmt(d.price)} ${d.unit}</b> | منبع: ${d.candle_source} (${d.bars_count} کندل)</span><span class="text-emerald-400">سرعت پردازش: ${d.elapsed_ms} میلی‌ثانیه</span>`;
+  document.getElementById('horizons-grid').innerHTML = Object.values(d.contract ? d.contract.contracts : d.contracts).map(h => {
     if (!h.evaluatable) return `<div class="bg-slate-900 border border-rose-900/50 p-3 rounded-xl text-xs"><b class="text-rose-400">${h.label}</b><div class="mt-1 text-rose-300">قابل ارزیابی نیست (${h.available_bars}/${h.required_min_bars} کندل)</div></div>`;
-    return `<div class="bg-slate-900 border border-slate-800 p-3 rounded-xl text-xs space-y-1"><b class="text-emerald-400">${h.label}</b><div>هدف: <b>${fmt(h.target)}</b> (<span class="text-emerald-400">+${h.net_target_return_pct}%</span>)</div><div>حد ضرر: <b>${fmt(h.stop)}</b> (<span class="text-rose-400">-${h.net_stop_loss_pct}%</span>)</div><div class="text-slate-400">R/R: ${h.reward_to_risk}</div></div>`;
+    return `<div class="bg-slate-900 border border-slate-800 p-3 rounded-xl text-xs space-y-1">
+      <div class="font-bold text-sky-400">${h.label}</div>
+      <div class="text-amber-300 font-bold">${h.action}</div>
+      <div>هدف: <b>${fmt(h.target)}</b> (<span class="text-emerald-400">+${h.net_return_pct}%</span>)</div>
+      <div>حد ضرر: <b>${fmt(h.stop)}</b> (<span class="text-rose-400">-${h.net_risk_pct}%</span>)</div>
+      <div class="text-slate-400">ریسک/ریوارد: ${h.rr}</div>
+    </div>`;
   }).join('');
 
-  document.getElementById('ai-grid').innerHTML = d.ai_pipeline.map(s => `<div class="bg-slate-900 border border-slate-800 p-3 rounded-lg text-xs"><div class="flex justify-between mb-1"><b class="text-sky-400">${s.step}</b><span class="text-slate-500">${s.mode}</span></div><div class="text-slate-200 leading-6">${s.analysis}</div></div>`).join('');
+  const t = d.technical;
+  document.getElementById('pa-info').innerHTML = `<div><b>ساختار:</b> ${t.structure}</div><div><b>فیبو ۰.۶۱۸ (حمایت):</b> ${fmt(t.fib['0.618'])} | <b>۰.۲۳۶ (مقاومت):</b> ${fmt(t.fib['0.236'])}</div>`;
+  document.getElementById('fund-info').innerText = `بنیادی/نقدشوندگی: ${d.fundamental}`;
+  document.getElementById('psych-info').innerText = `روانشناس: ${d.psychology.mood} — ${d.psychology.advice}`;
+  document.getElementById('st-past').innerText = '🔹 ' + d.strategies.past;
+  document.getElementById('st-present').innerText = '🔸 ' + d.strategies.present;
+  document.getElementById('st-future').innerText = '🔺 ' + d.strategies.future;
 
-  // رسم نمودارها
-  if (pChart) pChart.destroy();
-  if (rChart) rChart.destroy();
-  if (mChart) mChart.destroy();
-
-  const f618 = Array(t.dates.length).fill(t.fib["0.618"]);
-  const f236 = Array(t.dates.length).fill(t.fib["0.236"]);
-  pChart = new Chart(document.getElementById('priceChart'), {
+  if (pC) pC.destroy(); if (rC) rC.destroy(); if (mC) mC.destroy();
+  pC = new Chart(document.getElementById('priceChart'), {
     type: 'line',
-    data: {
-      labels: t.dates,
-      datasets: [
-        { label: 'قیمت', data: t.closes, borderColor: '#34d399', tension: 0.2, pointRadius: 0 },
-        { label: 'فیبو 0.236 (مقاومت)', data: f236, borderColor: '#f87171', borderDash: [4,4], pointRadius: 0 },
-        { label: 'فیبو 0.618 (حمایت طلایی)', data: f618, borderColor: '#fbbf24', borderDash: [4,4], pointRadius: 0 }
-      ]
-    },
-    options: { plugins: { legend: { labels: { color: '#cbd5e1', font: { size: 10 } } } }, scales: { x: { ticks: { color: '#64748b' } }, y: { ticks: { color: '#64748b' } } } }
+    data: { labels: t.dates, datasets: [
+      {label:'قیمت', data:t.closes, borderColor:'#34d399', pointRadius:0},
+      {label:'فیبو 0.236', data:Array(t.dates.length).fill(t.fib['0.236']), borderColor:'#f87171', borderDash:[4,4], pointRadius:0},
+      {label:'فیبو 0.618', data:Array(t.dates.length).fill(t.fib['0.618']), borderColor:'#fbbf24', borderDash:[4,4], pointRadius:0}
+    ]},
+    options: {plugins:{legend:{labels:{color:'#cbd5e1',font:{size:10}}}}, scales:{x:{ticks:{color:'#64748b'}},y:{ticks:{color:'#64748b'}}}}
   });
-
-  rChart = new Chart(document.getElementById('rsiChart'), {
-    type: 'line',
-    data: { labels: t.dates, datasets: [{ label: 'RSI', data: t.rsi_series, borderColor: '#a78bfa', tension: 0.2, pointRadius: 0 }] },
-    options: { scales: { y: { min: 0, max: 100, ticks: { color: '#64748b' } }, x: { ticks: { display: false } } }, plugins: { legend: { display: false } } }
-  });
-
-  mChart = new Chart(document.getElementById('macdChart'), {
-    data: {
-      labels: t.dates,
-      datasets: [
-        { type: 'line', label: 'MACD', data: t.macd_series, borderColor: '#38bdf8', pointRadius: 0 },
-        { type: 'line', label: 'Signal', data: t.signal_series, borderColor: '#fb923c', pointRadius: 0 },
-        { type: 'bar', label: 'Histogram', data: t.hist_series, backgroundColor: '#4ade80' }
-      ]
-    },
-    options: { scales: { x: { ticks: { display: false } }, y: { ticks: { color: '#64748b' } } }, plugins: { legend: { labels: { color: '#cbd5e1', font: { size: 10 } } } } }
-  });
+  rC = new Chart(document.getElementById('rsiChart'), {type:'line', data:{labels:t.dates, datasets:[{data:t.rsi_series, borderColor:'#a78bfa', pointRadius:0}]}, options:{plugins:{legend:{display:false}}, scales:{y:{min:0,max:100}, x:{ticks:{display:false}}}}});
+  mC = new Chart(document.getElementById('macdChart'), {data:{labels:t.dates, datasets:[{type:'line',label:'MACD',data:t.macd_series,borderColor:'#38bdf8',pointRadius:0},{type:'line',label:'Sig',data:t.signal_series,borderColor:'#fb923c',pointRadius:0},{type:'bar',label:'Hist',data:t.hist_series,backgroundColor:'#4ade80'}]}, options:{plugins:{legend:{labels:{color:'#cbd5e1',font:{size:10}}}}, scales:{x:{ticks:{display:false}}}}});
 }
 
 async function loadTop5() {
-  const data = await (await fetch('/api/top5-by-horizon')).json();
-  const labels = { H1_DAILY: 'روزانه', H2_WEEKLY: 'هفتگی', H3_MONTHLY: 'ماهانه', H4_QUARTERLY: 'سه‌ماهه' };
-  document.getElementById('top5-grid').innerHTML = Object.keys(labels).map(k => `
+  const d = await (await fetch('/api/top5-scanner')).json();
+  const names = {H1_DAILY:'۱) روزانه', H2_WEEKLY:'۲) هفتگی', H3_MONTHLY:'۳) ماهانه', H4_120D:'۴) ۱۲۰ روزه'};
+  document.getElementById('top5-grid').innerHTML = Object.keys(names).map(k => `
     <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 space-y-1.5 text-xs">
-      <div class="font-bold text-sky-400 border-b border-slate-800 pb-1">۵ برتر ${labels[k]}</div>
-      ${(data[k] || []).map((it, i) => `<div class="flex justify-between"><span>${i+1}. <b>${it.symbol}</b></span><span class="text-emerald-400 font-bold">+${it.net_return_pct}%</span></div>`).join('')}
-    </div>
-  `).join('');
+      <div class="font-bold text-sky-400 border-b border-slate-800 pb-1">۵ برتر ${names[k]}</div>
+      ${(d[k]||[]).map((x,i) => `<div onclick="pickSymbol('${x.symbol}','CRYPTO')" class="flex justify-between cursor-pointer hover:text-emerald-300"><span>${i+1}. <b>${x.symbol}</b></span><span class="text-emerald-400">+${x.net_return_pct}%</span></div>`).join('') || '<div class="text-slate-500">در حال بررسی...</div>'}
+    </div>`).join('');
 }
 
-async function loadPortfolio() {
+async function loadWL() { wl = await (await fetch('/api/watchlists')).json(); swTab(curTab); }
+function swTab(t) {
+  curTab = t;
+  document.querySelectorAll('.tbtn').forEach(b => b.className = b.dataset.t === t ? 'tbtn bg-emerald-600 px-3 py-1 rounded text-xs font-bold' : 'tbtn bg-slate-800 px-3 py-1 rounded text-xs');
+  document.getElementById('wl-body').innerHTML = (wl[t]||[]).map((it,i) => `<tr class="border-b border-slate-800/60"><td class="py-1.5 text-slate-500">${i+1}</td><td class="font-bold">${it.symbol} <span class="text-slate-400 font-normal">${it.name}</span></td><td class="text-slate-400">${fmt(it.yesterday)}</td><td class="font-bold">${fmt(it.today)} ${it.unit}</td><td class="${it.change_pct>=0?'text-emerald-400':'text-rose-400'} font-bold" dir="ltr">${it.change_pct}%</td></tr>`).join('');
+}
+
+async function loadPf() {
   const rows = await (await fetch('/api/portfolio')).json();
-  document.getElementById('portfolio-tbody').innerHTML = rows.map(r => `
-    <tr class="border-b border-slate-800/60">
-      <td class="py-2 font-bold">${r.symbol}</td><td>${r.market}</td><td>${fmt(r.quantity)}</td>
-      <td>${fmt(r.buy_price)}</td><td>${fmt(r.current_price)}</td>
-      <td class="${r.pnl_pct >= 0 ? 'text-emerald-400' : 'text-rose-400'} font-bold" dir="ltr">${r.pnl_pct}%</td>
-      <td dir="ltr">${r.day_pct}%</td>
-      <td class="font-bold text-${r.color}-400">${r.signal}</td>
-      <td><button onclick="delPf(${r.id})" class="text-rose-400">حذف</button></td>
-    </tr>
-  `).join('');
+  document.getElementById('pf-body').innerHTML = rows.map(r => `<tr class="border-b border-slate-800/60"><td class="py-1.5 font-bold">${r.symbol}</td><td>${r.market}</td><td>${fmt(r.quantity)}</td><td>${fmt(r.buy_price)}</td><td>${fmt(r.current_price)}</td><td class="${r.pnl_pct>=0?'text-emerald-400':'text-rose-400'} font-bold" dir="ltr">${r.pnl_pct}%</td><td>${r.signal}</td><td><button onclick="delPf(${r.id})" class="text-rose-400">حذف</button></td></tr>`).join('');
 }
-
-async function addPortfolio() {
-  await fetch('/api/portfolio', {
-    method: 'POST', headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({
-      symbol: document.getElementById('pf-sym').value,
-      market: document.getElementById('pf-mkt').value,
-      quantity: parseFloat(document.getElementById('pf-qty').value || 0),
-      avg_buy_price_toman: parseFloat(document.getElementById('pf-price').value || 0),
-    })
-  });
-  loadPortfolio();
+async function addPf() {
+  await fetch('/api/portfolio', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({symbol:document.getElementById('pf-sym').value, market:document.getElementById('pf-mkt').value, quantity:parseFloat(document.getElementById('pf-qty').value||0), avg_buy_price_toman:parseFloat(document.getElementById('pf-price').value||0)})});
+  loadPf();
 }
+async function delPf(id) { await fetch(`/api/portfolio/${id}`, {method:'DELETE'}); loadPf(); }
 
-async function delPf(id) { await fetch(`/api/portfolio/${id}`, { method: 'DELETE' }); loadPortfolio(); }
-
-loadOverview(); loadWatchlists(); loadTop5(); loadPortfolio(); analyzeSymbol();
+loadSys(); runAnalyze(); loadTop5(); loadWL(); loadPf();
 </script>
 </body>
 </html>
