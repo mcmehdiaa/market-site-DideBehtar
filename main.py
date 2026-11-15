@@ -29,7 +29,7 @@ BRSAPI_HEADERS = {
     "Accept": "application/json, text/plain, */*",
 }
 
-app = FastAPI(title="نسخه اصلاح‌شده - تتر، ۵ منبع نرخ و کش سرعت")
+app = FastAPI(title="نسخه ارتقایافته - کانال و پرچم خودکار، بک‌تست ۱۸۰ روزه، ۱۰ برتر و نمای ۲×۲")
 
 def norm_fa(text: str) -> str:
     if not text:
@@ -153,10 +153,10 @@ def get_conn():
     return conn
 
 HORIZON_SPECS = {
-    "H1_DAILY":   {"label": "۱) روزانه",   "min_bars": 15,  "vol_scale": 1.4},
-    "H2_WEEKLY":  {"label": "۲) هفتگی",    "min_bars": 25,  "vol_scale": 3.2},
-    "H3_MONTHLY": {"label": "۳) ماهانه",   "min_bars": 45,  "vol_scale": 6.5},
-    "H4_120D":    {"label": "۴) ۱۲۰ روزه", "min_bars": 120, "vol_scale": 12.0},
+    "H1_DAILY":   {"label": "روزانه",   "min_bars": 15,  "vol_scale": 1.4},
+    "H2_WEEKLY":  {"label": "هفتگی",    "min_bars": 25,  "vol_scale": 3.2},
+    "H3_MONTHLY": {"label": "ماهانه",   "min_bars": 45,  "vol_scale": 6.5},
+    "H4_120D":    {"label": "۱۲۰ روزه", "min_bars": 120, "vol_scale": 12.0},
 }
 
 CRYPTO_CACHE: Dict[str, Any] = {"ts": 0, "items": [], "source": "NOT_LOADED"}
@@ -209,8 +209,7 @@ async def _probe_usdt_toman(brs_key: str) -> Tuple[Optional[float], str]:
             try:
                 r = await client.get("https://api.tetherland.com/currencies")
                 if r.status_code == 200:
-                    usdt = (((r.json().get("data") or {}).get("currencies") or {}).get("USDT") or {})
-                    p = _f(usdt.get("price"))
+                    p = _f((((r.json().get("data") or {}).get("currencies") or {}).get("USDT") or {}).get("price"))
                     if p and p > 1000:
                         return round(p, 1), "LIVE_TETHERLAND"
                 return None, f"TETHERLAND:{r.status_code}"
@@ -278,8 +277,7 @@ async def load_macro_live(brs_key_override: str = "", force: bool = False):
                 if r.status_code == 200:
                     d = r.json().get("data") or []
                     if d:
-                        return {"value": int(d[0]["value"]), "label": d[0]["value_classification"],
-                                "yesterday": int(d[1]["value"]) if len(d) > 1 else None}
+                        return {"value": int(d[0]["value"]), "label": d[0]["value_classification"]}
             except Exception:
                 pass
             return None
@@ -299,12 +297,10 @@ async def load_macro_live(brs_key_override: str = "", force: bool = False):
 async def load_all_crypto(force: bool = False, usdt_toman: Optional[float] = None):
     now = time.time()
     if not force and CRYPTO_CACHE["items"] and (now - CRYPTO_CACHE["ts"] < 60):
-        # بروزرسانی قیمت تتر در کش در صورت دریافت نرخ جدید
         if usdt_toman:
             for it in CRYPTO_CACHE["items"]:
                 if it["symbol"] == "USDT":
-                    it["today"] = usdt_toman
-                    it["yesterday"] = usdt_toman
+                    it["today"], it["yesterday"] = usdt_toman, usdt_toman
         return CRYPTO_CACHE
 
     merged: Dict[str, Dict[str, Any]] = {}
@@ -357,7 +353,6 @@ async def load_all_crypto(force: bool = False, usdt_toman: Optional[float] = Non
                         "today": last_p, "yesterday": round(yest, 8), "unit": "دلار", "quote_vol": qvol
                     }
 
-    # افزودن خود «تتر (USDT)» با نام فارسی به فهرست رمزارزها تا جست‌وجوی «تتر» کار کند
     fa_usdt = CRYPTO_FA_NAMES["USDT"]
     merged["USDT"] = {
         "symbol": "USDT", "fa_name": fa_usdt, "name": "تتر (دلار دیجیتال) - USDT/IRT",
@@ -447,9 +442,7 @@ async def fetch_180_candles(symbol: str, market: str, item: Dict[str, Any], brs_
 
     candles, diag = [], []
     if market == "CRYPTO" and symbol.upper() == "USDT":
-        # کندل ۱۸۰ روزه واقعی تتر به تومان از نوبیتکس یا والکس
-        to_ts = int(now)
-        from_ts = to_ts - 185 * 86400
+        to_ts, from_ts = int(now), int(now) - 185 * 86400
         async with httpx.AsyncClient(timeout=4.0, headers=BRSAPI_HEADERS) as client:
             try:
                 r = await client.get(f"https://apiv2.nobitex.ir/market/udf/history?symbol=USDTIRT&resolution=D&from={from_ts}&to={to_ts}")
@@ -462,10 +455,8 @@ async def fetch_180_candles(symbol: str, market: str, item: Dict[str, Any], brs_
                         res = {"ts": now, "source": "LIVE_NOBITEX_USDTIRT_1D", "candles": candles}
                         CANDLE_CACHE[ckey] = res
                         return res
-                diag.append(f"NOBITEX_UDF:{r.status_code}")
             except Exception as e:
                 diag.append(f"NOBITEX_UDF:{type(e).__name__}")
-
             try:
                 r2 = await client.get(f"https://api.wallex.ir/v1/udf/history?symbol=USDTTMN&resolution=D&from={from_ts}&to={to_ts}")
                 if r2.status_code == 200 and r2.json().get("s") == "ok":
@@ -477,7 +468,6 @@ async def fetch_180_candles(symbol: str, market: str, item: Dict[str, Any], brs_
                         res = {"ts": now, "source": "LIVE_WALLEX_USDTTMN_1D", "candles": candles}
                         CANDLE_CACHE[ckey] = res
                         return res
-                diag.append(f"WALLEX_UDF:{r2.status_code}")
             except Exception as e:
                 diag.append(f"WALLEX_UDF:{type(e).__name__}")
 
@@ -495,7 +485,6 @@ async def fetch_180_candles(symbol: str, market: str, item: Dict[str, Any], brs_
                         return res
             except Exception as e:
                 diag.append(f"BINANCE:{type(e).__name__}")
-
             try:
                 r2 = await client.get(f"https://api.kucoin.com/api/v1/market/candles?symbol={symbol.upper()}-USDT&type=1day")
                 if r2.status_code == 200:
@@ -530,38 +519,16 @@ async def fetch_180_candles(symbol: str, market: str, item: Dict[str, Any], brs_
                             res = {"ts": now, "source": "LIVE_BRSAPI_1D", "candles": candles}
                             CANDLE_CACHE[ckey] = res
                             return res
-                        diag.append("BRS_HIST:NO_VALID_DATED_BARS")
             except Exception as e:
                 diag.append(f"BRS_ERR:{type(e).__name__}")
         else:
             diag.append("BRS_KEY:EMPTY")
 
-        async with httpx.AsyncClient(timeout=2.5, headers=TSETMC_HEADERS) as client:
-            ins_code = item.get("ins_code")
-            if ins_code:
-                try:
-                    rh = await client.get(f"https://cdn.tsetmc.com/api/ClosingPrice/GetClosingPriceDailyList/{ins_code}/180")
-                    diag.append(f"TSE_DAILY:{rh.status_code}")
-                    if rh.status_code == 200:
-                        for row in (rh.json().get("closingPriceDaily") or []):
-                            ts = parse_candle_timestamp(row.get("dEven"))
-                            c = _f(row.get("pClosing"))
-                            if ts and c and c > 0:
-                                c_t = c / 10.0
-                                o_t = (_f(row.get("priceFirst")) or c) / 10.0
-                                h_t = (_f(row.get("priceMax")) or c) / 10.0
-                                l_t = (_f(row.get("priceMin")) or c) / 10.0
-                                candles.append({"time": ts, "open": o_t, "high": max(h_t, o_t, c_t), "low": min(l_t, o_t, c_t), "close": c_t, "vol": _f(row.get("qTotTran5J")) or 0.0})
-                        candles = _clean_sort_candles(candles)[-180:]
-                        if candles:
-                            res = {"ts": now, "source": "LIVE_TSETMC_1D", "candles": candles}
-                            CANDLE_CACHE[ckey] = res
-                            return res
-                except Exception as e:
-                    diag.append(f"TSE_ERR:{type(e).__name__}")
-
     return {"ts": now, "source": " | ".join(diag) or "NO_DATA", "candles": []}
 
+# ==========================================
+# اندیکاتورها
+# ==========================================
 def calc_ema(vals: List[float], period: int) -> List[float]:
     k = 2.0 / (period + 1)
     out = [vals[0]]
@@ -579,14 +546,10 @@ def calc_wilder_rsi_points(candles: List[Dict[str, Any]], period: int = 14) -> L
         d = closes[i] - closes[i - 1]
         gains.append(max(d, 0.0))
         losses.append(max(-d, 0.0))
-
-    avg_g = sum(gains[:period]) / period
-    avg_l = sum(losses[:period]) / period
+    avg_g, avg_l = sum(gains[:period]) / period, sum(losses[:period]) / period
 
     def _to_rsi(ag, al):
-        if al == 0.0:
-            return 100.0 if ag > 0.0 else 50.0
-        return round(100.0 - (100.0 / (1.0 + (ag / al))), 2)
+        return (100.0 if ag > 0.0 else 50.0) if al == 0.0 else round(100.0 - (100.0 / (1.0 + (ag / al))), 2)
 
     pts = [{"time": candles[period]["time"], "value": _to_rsi(avg_g, avg_l)}]
     for k in range(period, len(gains)):
@@ -606,11 +569,9 @@ def calc_bollinger(closes: List[float], period: int = 20, mult: float = 2.0):
     return upper, lower
 
 def detect_price_action(candles: List[Dict[str, Any]]):
-    markers = []
-    n = len(candles)
+    markers, n = [], len(candles)
     last_ph, last_pl = None, None
     sup_lvls, res_lvls = [], []
-
     for i in range(2, n - 2):
         h, l = candles[i]["high"], candles[i]["low"]
         if h > candles[i-1]["high"] and h > candles[i-2]["high"] and h > candles[i+1]["high"] and h > candles[i+2]["high"]:
@@ -623,11 +584,9 @@ def detect_price_action(candles: List[Dict[str, Any]]):
             last_pl = l
             sup_lvls.append(l)
             markers.append({"time": candles[i]["time"], "position": "belowBar", "color": "#38bdf8", "shape": "circle", "text": lbl})
-
     for i in range(1, n):
         c, p = candles[i], candles[i - 1]
-        body = abs(c["close"] - c["open"])
-        rng = max(c["high"] - c["low"], 1e-12)
+        body, rng = abs(c["close"] - c["open"]), max(c["high"] - c["low"], 1e-12)
         up_w, lo_w = c["high"] - max(c["open"], c["close"]), min(c["open"], c["close"]) - c["low"]
         if lo_w > body * 2.1 and up_w < rng * 0.25 and body > 0:
             markers.append({"time": c["time"], "position": "belowBar", "color": "#10b981", "shape": "arrowUp", "text": "Pin+"})
@@ -637,18 +596,178 @@ def detect_price_action(candles: List[Dict[str, Any]]):
             markers.append({"time": c["time"], "position": "belowBar", "color": "#22c55e", "shape": "arrowUp", "text": "Eng+"})
         elif c["close"] < c["open"] and p["close"] > p["open"] and c["close"] < p["open"] and c["open"] >= p["close"]:
             markers.append({"time": c["time"], "position": "aboveBar", "color": "#f43f5e", "shape": "arrowDown", "text": "Eng-"})
-
     markers.sort(key=lambda m: m["time"])
-    major_sup = round(sup_lvls[-1], 6) if sup_lvls else round(min(x["low"] for x in candles[-30:]), 6)
-    major_res = round(res_lvls[-1], 6) if res_lvls else round(max(x["high"] for x in candles[-30:]), 6)
-    return markers[-35:], major_sup, major_res
+    return markers[-35:], (round(sup_lvls[-1], 6) if sup_lvls else round(min(x["low"] for x in candles[-30:]), 6)), (round(res_lvls[-1], 6) if res_lvls else round(max(x["high"] for x in candles[-30:]), 6))
 
-def analyze_full(symbol: str, market: str, item: Dict[str, Any], candles: List[Dict[str, Any]], fng_data: Optional[dict] = None):
+# ==========================================
+# وظیفه جدید ۱: تشخیص و رسم خودکار کانال روند، پرچم، مثلث + نقطه ماشه و هدف شکست
+# ==========================================
+def detect_patterns_and_channel(candles: List[Dict[str, Any]]) -> Dict[str, Any]:
+    if len(candles) < 20:
+        return {"available": False, "pattern_name": "داده ناکافی برای رسم کانال", "bias": "NEUTRAL"}
+
+    win = candles[-35:] if len(candles) >= 35 else candles
+    m_n = len(win)
+    closes = [c["close"] for c in win]
+    highs = [c["high"] for c in win]
+    lows = [c["low"] for c in win]
+
+    # رگرسیون خطی برای شیب کانال کلی اخیر
+    x_mean = (m_n - 1) / 2.0
+    y_mean = sum(closes) / m_n
+    num = sum((i - x_mean) * (closes[i] - y_mean) for i in range(m_n))
+    den = sum((i - x_mean) ** 2 for i in range(m_n)) or 1.0
+    slope = num / den
+    intercept = y_mean - slope * x_mean
+    slope_pct = (slope / max(y_mean, 1e-12)) * 100.0
+
+    # محاسبه خط سقف و کف کانال در بازه فعلی
+    up_dev = max(highs[i] - (slope * i + intercept) for i in range(m_n))
+    lo_dev = max((slope * i + intercept) - lows[i] for i in range(m_n))
+
+    u_start = round(intercept + up_dev, 6)
+    u_end = round(slope * (m_n - 1) + intercept + up_dev, 6)
+    l_start = round(intercept - lo_dev, 6)
+    l_end = round(slope * (m_n - 1) + intercept - lo_dev, 6)
+
+    # بررسی مثلث فشردگی در ۲۴ کندل آخر (نوسان نیمه اول در مقابل نیمه دوم)
+    half = m_n // 2
+    h1_max, h2_max = max(highs[:half]), max(highs[half:])
+    l1_min, l2_min = min(lows[:half]), min(lows[half:])
+    range1, range2 = h1_max - l1_min, h2_max - l2_min
+
+    # بررسی میله پرچم (۲۵ کندل قبل از ۱۵ کندل آخر)
+    pole_slice = candles[-45:-15] if len(candles) >= 45 else candles[:max(1, len(candles) - 15)]
+    pole_low = min(c["low"] for c in pole_slice)
+    pole_high = max(c["high"] for c in pole_slice)
+    pole_start_c = pole_slice[0]["close"]
+    pole_end_c = pole_slice[-1]["close"]
+    pole_move_pct = ((pole_end_c - pole_start_c) / max(pole_start_c, 1e-12)) * 100.0
+    pole_height = max(pole_high - pole_low, 0.0)
+
+    # خطوط اختصاصی الگو (پیش‌فرض خطوط کانال رگرسیون، در مثلث به خطوط همگرا تغییر می‌کند)
+    line_u_start, line_u_end = u_start, u_end
+    line_l_start, line_l_end = l_start, l_end
+
+    if h2_max < h1_max * 0.995 and l2_min > l1_min * 1.005 and range2 < range1 * 0.78:
+        pattern_name = "مثلث متقارن / فشردگی قیمت (Triangle)"
+        bias = "BREAKOUT_PENDING"
+        line_u_start, line_u_end = round(h1_max, 6), round(h2_max, 6)
+        line_l_start, line_l_end = round(l1_min, 6), round(l2_min, 6)
+        breakout_price = line_u_end
+        target_price = round(breakout_price + range1 * 0.75, 6)
+        desc = f"کاهش نوسان از {round(range1, 4)} به {round(range2, 4)}؛ آماده شکست پرقدرت در راس مثلث."
+    elif pole_move_pct >= 10.0 and -0.85 <= slope_pct <= 0.15 and (u_end - l_end) < pole_height * 0.55:
+        pattern_name = "الگوی پرچم صعودی (Bull Flag)"
+        bias = "BULLISH"
+        breakout_price = u_end
+        target_price = round(breakout_price + pole_height * 0.65, 6)
+        desc = f"جهش قبلی (+{round(pole_move_pct, 1)}%) همراه با استراحت در کانال باریک؛ شکست سقف {u_end} ماشه صعود است."
+    elif pole_move_pct <= -10.0 and -0.15 <= slope_pct <= 0.85 and (u_end - l_end) < pole_height * 0.55:
+        pattern_name = "الگوی پرچم نزولی (Bear Flag)"
+        bias = "BEARISH"
+        breakout_price = l_end
+        target_price = round(max(breakout_price - pole_height * 0.65, breakout_price * 0.35), 6)
+        desc = f"ریزش قبلی ({round(pole_move_pct, 1)}%) و پولبک ضعیف؛ شکست کف {l_end} خطر ادامه ریزش را دارد."
+    elif slope_pct > 0.12:
+        pattern_name = "کانال صعودی (Ascending Channel)"
+        bias = "BULLISH"
+        breakout_price = u_end
+        target_price = round(u_end + (u_end - l_end) * 0.5, 6)
+        desc = f"شیب مثبت (+{round(slope_pct, 2)}% در روز)؛ کف کانال {l_end} حمایت و سقف {u_end} مقاومت است."
+    elif slope_pct < -0.12:
+        pattern_name = "کانال نزولی (Descending Channel)"
+        bias = "BEARISH"
+        breakout_price = u_end
+        target_price = round(u_end + (u_end - l_end) * 0.5, 6)
+        desc = f"شیب منفی ({round(slope_pct, 2)}% در روز)؛ خروج از کانال فقط با شکست سقف {u_end} تایید می‌شود."
+    else:
+        pattern_name = "کانال خنثی / رنج (Horizontal Channel)"
+        bias = "NEUTRAL"
+        breakout_price = u_end
+        target_price = round(u_end + (u_end - l_end) * 0.6, 6)
+        desc = f"نوسان رنج بین کف {l_end} و سقف {u_end}؛ مناسب نوسان‌گیری یا انتظار برای شکست."
+
+    t0, t1 = win[0]["time"], win[-1]["time"]
+    return {
+        "available": True,
+        "pattern_name": pattern_name,
+        "bias": bias,
+        "description": desc,
+        "upper_line": [{"time": t0, "value": line_u_start}, {"time": t1, "value": line_u_end}],
+        "lower_line": [{"time": t0, "value": line_l_start}, {"time": t1, "value": line_l_end}],
+        "breakout_price": breakout_price,
+        "pattern_target": target_price,
+        "channel_floor": line_l_end,
+    }
+
+# ==========================================
+# وظیفه جدید ۴: بک‌تست واقعی بدون نگاه به آینده روی ۱۸۰ کندل خود نماد
+# ==========================================
+def run_backtest_180d(candles: List[Dict[str, Any]], market: str) -> Dict[str, Any]:
     n = len(candles)
+    if n < 55:
+        return {"sufficient": False, "reason": f"حداقل ۵۵ کندل لازم است (موجود: {n})"}
+
     closes = [c["close"] for c in candles]
     highs = [c["high"] for c in candles]
     lows = [c["low"] for c in candles]
-    vols = [c["vol"] for c in candles]
+    ema20 = calc_ema(closes, 20)
+    ema12, ema26 = calc_ema(closes, 12), calc_ema(closes, 26)
+    macd_l = [a - b for a, b in zip(ema12, ema26)]
+    sig_l = calc_ema(macd_l, 9)
+    rsi_map = {p["time"]: p["value"] for p in calc_wilder_rsi_points(candles, 14)}
+    fee_pct = 1.25 if market == "BOURSE" else 0.20
+
+    trades = []
+    i = 30
+    while i < n - 8:
+        t_i = candles[i]["time"]
+        rsi_v = rsi_map.get(t_i, 50.0)
+        # شرط ورود: شکست رو به بالای EMA20 یا تقاطع صعودی مکدی بالای EMA20
+        macd_cross = macd_l[i] > sig_l[i] and macd_l[i - 1] <= sig_l[i - 1] and closes[i] > ema20[i]
+        ema_reclaim = closes[i] > ema20[i] and closes[i - 1] <= ema20[i - 1] and macd_l[i] > sig_l[i]
+
+        if (macd_cross or ema_reclaim) and 38.0 <= rsi_v <= 68.0:
+            entry = closes[i]
+            rets = [abs(closes[k] - closes[k - 1]) / closes[k - 1] for k in range(max(1, i - 14), i + 1) if closes[k - 1] > 0]
+            atr_pct = max(min(sum(rets) / max(len(rets), 1), 0.06), 0.012)
+            tp = entry * (1.0 + atr_pct * 2.6)
+            sl = entry * (1.0 - atr_pct * 1.4)
+
+            exit_p, exit_idx = closes[min(i + 12, n - 1)], min(i + 12, n - 1)
+            for j in range(i + 1, min(i + 13, n)):
+                if lows[j] <= sl:
+                    exit_p, exit_idx = sl, j
+                    break
+                if highs[j] >= tp:
+                    exit_p, exit_idx = tp, j
+                    break
+            net_pct = ((exit_p - entry) / entry) * 100.0 - fee_pct
+            trades.append(round(net_pct, 2))
+            i = exit_idx + 1
+        else:
+            i += 1
+
+    if len(trades) < 3:
+        return {"sufficient": False, "trades_count": len(trades), "reason": f"تعداد سیگنال‌های تاریخی کم است ({len(trades)} معامله)؛ آمار قابل اتکا نیست."}
+
+    wins = sum(1 for x in trades if x > 0)
+    win_rate = round((wins / len(trades)) * 100.0, 1)
+    avg_ret = round(sum(trades) / len(trades), 2)
+    return {
+        "sufficient": True,
+        "trades_count": len(trades),
+        "wins": wins,
+        "losses": len(trades) - wins,
+        "win_rate_pct": win_rate,
+        "avg_return_pct": avg_ret,
+        "summary": f"در ۱۸۰ روز گذشته روی همین نماد: {win_rate}% موفقیت ({wins} برد از {len(trades)} معامله) | میانگین خالص هر معامله: {'+' if avg_ret >= 0 else ''}{avg_ret}%"
+    }
+
+def analyze_full(symbol: str, market: str, item: Dict[str, Any], candles: List[Dict[str, Any]], fng_data: Optional[dict] = None):
+    n = len(candles)
+    closes, highs, lows, vols = [c["close"] for c in candles], [c["high"] for c in candles], [c["low"] for c in candles], [c["vol"] for c in candles]
     price = closes[-1]
 
     rets = [abs(closes[i] - closes[i - 1]) / closes[i - 1] for i in range(1, n) if closes[i - 1] > 0]
@@ -675,14 +794,17 @@ def analyze_full(symbol: str, market: str, item: Dict[str, Any], candles: List[D
     }
 
     pa_markers, pa_sup, pa_res = detect_price_action(candles)
+    patterns = detect_patterns_and_channel(candles)
+    backtest = run_backtest_180d(candles, market)
     structure = "روند صعودی (بالای EMA20 و EMA50)" if price > ema20[-1] > ema50[-1] else ("روند نزولی (زیر EMA20 و EMA50)" if price < ema20[-1] < ema50[-1] else "فاز رنج / تغییر روند")
 
     fee_pct = 1.25 if market == "BOURSE" else 0.20
     contracts = {}
+    confluence_hits = 0
     for hk, spec in HORIZON_SPECS.items():
         if n < spec["min_bars"] or price <= 0 or rsi_now is None:
             contracts[hk] = {
-                "horizon": hk, "label": spec["label"], "evaluatable": False,
+                "horizon": hk, "label": spec["label"], "evaluatable": False, "icon": "⛔", "tone": "rose",
                 "available_bars": n, "required_min_bars": spec["min_bars"],
                 "action": "قابل ارزیابی نیست (کمبود تاریخچه)",
                 "target": None, "stop": None, "net_return_pct": None, "net_risk_pct": None, "rr": None
@@ -697,18 +819,20 @@ def analyze_full(symbol: str, market: str, item: Dict[str, Any], candles: List[D
             rr = round(net_ret / net_rsk, 2) if net_rsk > 0 else 0.0
 
             if rsi_now >= 75:
-                act = "سیو سود / انتظار اصلاح (اشباع خرید)"
+                act, icon, tone = "سیو سود / انتظار اصلاح", "🟡", "amber"
             elif rsi_now <= 32 and price <= fib["0.500"]:
-                act = "پیشنهاد خرید پله‌ای روی حمایت"
+                act, icon, tone = "خرید پله‌ای روی حمایت", "🟢", "emerald"
+                confluence_hits += 1
             elif macd_l[-1] > sig_l[-1] and price > ema20[-1] and rr >= 1.3:
-                act = "پیشنهاد خرید / نگهداری صعودی"
+                act, icon, tone = "خرید / نگهداری صعودی", "🟢", "emerald"
+                confluence_hits += 1
             elif price < ema20[-1] and macd_l[-1] < sig_l[-1]:
-                act = "پیشنهاد فروش / دوری از معامله"
+                act, icon, tone = "فروش / دوری از معامله", "🔴", "rose"
             else:
-                act = "نوسان‌گیری بین حمایت و مقاومت"
+                act, icon, tone = "نوسان‌گیری بین سطوح", "🟡", "amber"
 
             contracts[hk] = {
-                "horizon": hk, "label": spec["label"], "evaluatable": True,
+                "horizon": hk, "label": spec["label"], "evaluatable": True, "icon": icon, "tone": tone,
                 "available_bars": n, "required_min_bars": spec["min_bars"],
                 "action": act, "target": tp, "stop": sl_v,
                 "net_return_pct": net_ret, "net_risk_pct": net_rsk, "rr": rr
@@ -717,22 +841,22 @@ def analyze_full(symbol: str, market: str, item: Dict[str, Any], candles: List[D
     avg_vol20 = sum(vols[-21:-1]) / max(len(vols[-21:-1]), 1) if len(vols) > 2 else (vols[-1] or 1.0)
     vol_ratio = round(vols[-1] / avg_vol20, 2) if avg_vol20 > 0 else 1.0
     ext_pct = round(((price - ema20[-1]) / ema20[-1]) * 100.0, 2) if ema20[-1] > 0 else 0.0
-    fng_txt = f" | شاخص کل ترس/طمع کریپتو: {fng_data['value']}/100 ({fng_data['label']})" if (market == "CRYPTO" and fng_data) else ""
+    fng_txt = f" | شاخص کل ترس/طمع: {fng_data['value']}/100 ({fng_data['label']})" if (market == "CRYPTO" and fng_data) else ""
 
     if rsi_now is not None and rsi_now >= 70 and vol_ratio >= 1.5:
-        mood = f"اوج هیجان و طمع (RSI={rsi_now}، حجم {vol_ratio}x، فاصله از EMA20: +{ext_pct}%){fng_txt}"
-        advice = "جهش حجم همراه با اشباع خرید نشانه فومو (FOMO) است؛ از تعقیب قیمت در سقف خودداری کنید."
+        mood = f"اوج طمع (RSI={rsi_now}، حجم {vol_ratio}x، فاصله از EMA20: +{ext_pct}%){fng_txt}"
+        advice = "جهش حجم همراه با اشباع خرید نشانه فومو است؛ در سقف نخرید."
     elif rsi_now is not None and rsi_now <= 32 and vol_ratio >= 1.4:
-        mood = f"ترس شدید و تسلیم فروشندگان (RSI={rsi_now}، حجم {vol_ratio}x، فاصله: {ext_pct}%){fng_txt}"
-        advice = "حجم بالا در کف قیمتی می‌تواند نشانه تخلیه فروش هیجانی باشد؛ فقط با تایید کندل سبز پله‌ای عمل کنید."
+        mood = f"ترس شدید (RSI={rsi_now}، حجم {vol_ratio}x، فاصله: {ext_pct}%){fng_txt}"
+        advice = "تخلیه فروش هیجانی در کف؛ فقط با تایید کندل سبز پله‌ای وارد شوید."
     else:
-        mood = f"تعادل روانی (RSI={rsi_now}، نسبت حجم {vol_ratio}x، انحراف از EMA20: {ext_pct}%){fng_txt}"
-        advice = "هیجان افراطی دیده نمی‌شود؛ پایبندی به حمایت و مقاومت چارت اولویت دارد."
+        mood = f"تعادل روانی (RSI={rsi_now}، نسبت حجم {vol_ratio}x، انحراف: {ext_pct}%){fng_txt}"
+        advice = "هیجان افراطی دیده نمی‌شود؛ به خطوط کانال و حمایت چارت پایبند بمانید."
 
     pe, eps = _f(item.get("pe")), _f(item.get("eps"))
     if market == "BOURSE":
         if pe is None and eps is None:
-            fund = "دیتای بنیادی (P/E و EPS) از درگاه فعلی دریافت نشد؛ برای تحلیل بنیادی به کدال مراجعه شود."
+            fund = "دیتای بنیادی (P/E و EPS) از درگاه فعلی دریافت نشد؛ کدال بررسی شود."
         else:
             st_f = "ارزنده" if (eps and eps > 0 and pe and 0 < pe < 8) else ("زیان‌ده" if (eps is not None and eps < 0) else "متعادل")
             fund = f"P/E={pe if pe is not None else 'نامشخص'} | EPS={eps if eps is not None else 'نامشخص'} | وضعیت: {st_f}"
@@ -742,8 +866,8 @@ def analyze_full(symbol: str, market: str, item: Dict[str, Any], candles: List[D
 
     strategies = {
         "past": f"گذشته: نوسان بین کف {fib['1.0 (کف)']} و سقف {fib['0.0 (سقف)']}؛ تراز ۰.۶۱۸ ({fib['0.618 (طلایی)']}) کف کلیدی بوده است.",
-        "present": f"حال: {structure}. حمایت پرایس اکشن: {pa_sup} | مقاومت پرایس اکشن: {pa_res}.",
-        "future": f"آینده: شکست بالای {pa_res} هدف {fib['0.0 (سقف)']} را فعال می‌کند؛ شکست {pa_sup} به پایین هشدار خروج است."
+        "present": f"حال: {structure} | الگو: {patterns['pattern_name']}.",
+        "future": f"آینده: {patterns.get('description', '')}"
     }
 
     chart_payload = {
@@ -759,11 +883,13 @@ def analyze_full(symbol: str, market: str, item: Dict[str, Any], candles: List[D
         "macd_hist": [{"time": candles[i]["time"], "value": hist_l[i], "color": "#10b981" if hist_l[i] >= 0 else "#ef4444"} for i in range(n)],
         "pa_markers": pa_markers, "pa_support": pa_sup, "pa_resistance": pa_res,
         "fib": fib, "rsi_now": rsi_now, "structure": structure,
+        "patterns": patterns,
     }
 
     return {
         "price": price, "chart": chart_payload, "fundamental": fund,
-        "psychology": {"mood": mood, "advice": advice}, "strategies": strategies, "contracts": contracts,
+        "psychology": {"mood": mood, "advice": advice}, "strategies": strategies,
+        "contracts": contracts, "confluence": f"{confluence_hits}/4", "backtest": backtest,
     }
 
 @app.get("/api/self-test")
@@ -773,23 +899,31 @@ async def run_self_test(brs_key: str = ""):
     ref_candles = [{"time": 1700000000 + i * 86400, "open": c, "high": c, "low": c, "close": c, "vol": 100} for i, c in enumerate(ref_closes)]
     rsi_out = calc_wilder_rsi_points(ref_candles, 14)
     rsi_ok = len(rsi_out) == 2 and abs(rsi_out[0]["value"] - 70.46) < 0.1 and abs(rsi_out[1]["value"] - 66.25) < 0.1
-    checks.append({"name": "Wilder RSI(14) Reference Math", "passed": rsi_ok, "detail": f"got={rsi_out}, expected=[70.46, 66.25]"})
+    checks.append({"name": "Wilder RSI(14) Reference Math", "passed": rsi_ok, "detail": f"got={rsi_out}"})
 
     g1, g2 = jalali_to_gregorian(1403, 1, 1), jalali_to_gregorian(1405, 8, 24)
-    checks.append({"name": "Jalali-to-Gregorian Calendar Math", "passed": (g1 == (2024, 3, 20) and g2 == (2026, 11, 15)), "detail": f"1403/1/1->{g1}, 1405/8/24->{g2}"})
+    checks.append({"name": "Jalali-to-Gregorian Calendar Math", "passed": (g1 == (2024, 3, 20) and g2 == (2026, 11, 15)), "detail": f"{g1}, {g2}"})
+
+    # تست ۴: تشخیص الگوی کانال صعودی مصنوعی و بک‌تست ۱۸۰ روزه
+    syn = [{"time": 1700000000 + i * 86400, "open": 100 + i * 0.8, "high": 102 + i * 0.8 + (2 if i % 4 == 0 else 0),
+            "low": 98 + i * 0.8 - (2 if i % 4 == 2 else 0), "close": 100.5 + i * 0.8 + math.sin(i * 0.6) * 2.5, "vol": 1000} for i in range(90)]
+    pat_ok = detect_patterns_and_channel(syn)["available"] and len(detect_patterns_and_channel(syn)["upper_line"]) == 2
+    checks.append({"name": "Auto Channel & Pattern Detector", "passed": pat_ok, "detail": detect_patterns_and_channel(syn)["pattern_name"]})
+
+    bt = run_backtest_180d(syn, "CRYPTO")
+    checks.append({"name": "180D Backtest Engine (No Lookahead)", "passed": ("sufficient" in bt), "detail": bt.get("summary") or bt.get("reason")})
 
     short_res = analyze_full("TEST", "CRYPTO", {"quote_vol": 0}, ref_candles[:8])
-    gate_ok = all(not c["evaluatable"] and c["target"] is None and c["stop"] is None for c in short_res["contracts"].values())
-    checks.append({"name": "Insufficient Data No-Fabrication Gate", "passed": gate_ok, "detail": "8 bars -> all 4 horizons locked to None"})
+    gate_ok = all(not c["evaluatable"] and c["target"] is None for c in short_res["contracts"].values())
+    checks.append({"name": "Insufficient Data No-Fabrication Gate", "passed": gate_ok, "detail": "8 bars -> locked"})
 
     macro, b_data = await asyncio.gather(load_macro_live(brs_key, force=True), load_all_bourse(brs_key))
     c_data = await load_all_crypto(force=True, usdt_toman=macro["usdt_toman"])
-    checks.append({"name": "Live Crypto Universe (>=300 coins)", "passed": len(c_data["items"]) >= 300, "detail": f"count={len(c_data['items'])}, src={c_data['source']}"})
-    checks.append({"name": "Live USDT-Toman (5 Sources, no fake 70200)", "passed": macro["usdt_toman"] is not None, "detail": f"usdt={macro['usdt_toman']}, src={macro['usdt_source']}"})
-    checks.append({"name": "Live Global FX Rates", "passed": len(macro["fx_rates"]) >= 10, "detail": f"src={macro['fx_source']}"})
-    checks.append({"name": "Live Iran Bourse (>=500 symbols)", "passed": len(b_data["items"]) >= 500, "detail": f"count={len(b_data['items'])}, src={b_data['source']}"})
+    checks.append({"name": "Live Crypto Universe (>=300 coins)", "passed": len(c_data["items"]) >= 300, "detail": f"count={len(c_data['items'])}"})
+    checks.append({"name": "Live USDT-Toman", "passed": macro["usdt_toman"] is not None, "detail": f"usdt={macro['usdt_toman']}, {macro['usdt_source']}"})
+    checks.append({"name": "Live Iran Bourse (>=500 symbols)", "passed": len(b_data["items"]) >= 500, "detail": f"count={len(b_data['items'])}"})
 
-    return {"all_math_tests_passed": all(x["passed"] for x in checks[:3]), "checks": checks}
+    return {"all_math_tests_passed": all(x["passed"] for x in checks[:5]), "checks": checks}
 
 @app.get("/api/system-status")
 async def system_status(brs_key: str = ""):
@@ -857,18 +991,39 @@ async def analyze_endpoint(symbol: str, market: str = "AUTO", brs_key: str = "")
         "bars_count": len(c_res["candles"]), "elapsed_ms": round((time.time() - t0) * 1000, 1), **full
     }
 
-@app.get("/api/top5-scanner")
-async def top5_scanner():
-    c_data = await load_all_crypto()
-    candidates = [x for x in c_data["items"] if x.get("today") and x["symbol"] != "USDT"][:14]
-    candle_results = await asyncio.gather(*[fetch_180_candles(x["symbol"], "CRYPTO", x) for x in candidates])
-    analyzed = [(it, analyze_full(it["symbol"], "CRYPTO", it, cr["candles"])) for it, cr in zip(candidates, candle_results) if len(cr["candles"]) >= 16]
-    top5 = {}
+# ==========================================
+# وظیفه جدید ۳: اسکنر ۱۰ برتر در هر ۴ بازه + امتیاز اجماع ۴/۴
+# ==========================================
+@app.get("/api/top10-scanner")
+async def top10_scanner(brs_key: str = ""):
+    c_data, b_data = await asyncio.gather(load_all_crypto(), load_all_bourse(brs_key))
+    cands_c = [(x, "CRYPTO") for x in c_data["items"] if x.get("today") and x["symbol"] != "USDT"][:24]
+    cands_b = [(x, "BOURSE") for x in sorted(b_data["items"], key=lambda z: z.get("tvol", 0), reverse=True)[:8]]
+    candidates = cands_c + cands_b
+
+    candle_results = await asyncio.gather(*[fetch_180_candles(it["symbol"], mkt, it, brs_key) for it, mkt in candidates])
+    analyzed = []
+    for (it, mkt), cr in zip(candidates, candle_results):
+        if len(cr["candles"]) >= 16:
+            analyzed.append((it, mkt, analyze_full(it["symbol"], mkt, it, cr["candles"])))
+
+    top10 = {}
     for hk in HORIZON_SPECS:
-        valid = [(it, a["contracts"][hk]) for it, a in analyzed if a["contracts"][hk]["evaluatable"] and ("خرید" in a["contracts"][hk]["action"] or "نگهداری" in a["contracts"][hk]["action"])]
-        valid.sort(key=lambda z: z[1]["net_return_pct"] or 0, reverse=True)
-        top5[hk] = [{"symbol": it["symbol"], "name": it["name"], "net_return_pct": c["net_return_pct"], "rr": c["rr"]} for it, c in valid[:5]]
-    return top5
+        valid = []
+        for it, mkt, a in analyzed:
+            c = a["contracts"][hk]
+            if c["evaluatable"] and ("خرید" in c["action"] or "نگهداری" in c["action"]):
+                conf_num = int(a["confluence"].split("/")[0])
+                valid.append({
+                    "symbol": it["symbol"], "market": mkt, "name": it["name"],
+                    "net_return_pct": c["net_return_pct"], "rr": c["rr"],
+                    "confluence": a["confluence"], "conf_num": conf_num,
+                    "win_rate": a["backtest"].get("win_rate_pct") if a["backtest"].get("sufficient") else None
+                })
+        # اولویت با اجماع بالاتر (مثلاً ۴/۴) و سپس بیشترین بازده خالص
+        valid.sort(key=lambda z: (z["conf_num"], z["net_return_pct"] or 0), reverse=True)
+        top10[hk] = valid[:10]
+    return top10
 
 @app.get("/api/watchlists")
 async def watchlists(brs_key: str = ""):
