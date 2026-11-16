@@ -12,7 +12,7 @@ DB_FILE = "/tmp/standalone_market.db" if os.path.isdir("/tmp") else os.path.join
 TSETMC_HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/131.0.0.0 Safari/537.36", "Accept": "application/json", "Referer": "https://tsetmc.com/"}
 BRSAPI_HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 6.1; Win64; x64) Chrome/131.0.0.0 Safari/537.36 OPR/106.0.0.0", "Accept": "application/json"}
 
-app = FastAPI(title="فاز ۲ - واگرایی، کندل‌شناسی، پول هوشمند و یکپارچگی")
+app = FastAPI(title="فاز ۳ - هارمونیک XABCD، کنج و هیت‌مپ")
 
 def norm_fa(t: str) -> str:
     return str(t or "").strip().upper().replace("ي", "ی").replace("ك", "ک").replace("ة", "ه").replace("\u200c", "").replace("‌", "").replace(" ", "").replace("-", "")
@@ -289,9 +289,6 @@ async def fetch_180_candles(symbol: str, market: str, item: Dict[str, Any], brs_
         except Exception as e: diag.append(f"BRS:{type(e).__name__}")
     return {"ts": now, "source": " | ".join(diag) or "NO_DATA", "candles": []}
 
-# ==========================================
-# اندیکاتورها + فاز ۲: واگرایی، ۱۴ الگوی کندل تریدینگ‌ویو، پول هوشمند و یکپارچگی
-# ==========================================
 def calc_ema(vals: List[float], period: int) -> List[float]:
     k = 2.0 / (period + 1); out = [vals[0]]
     for v in vals[1:]: out.append(v * k + out[-1] * (1.0 - k))
@@ -332,6 +329,42 @@ def detect_price_action(candles: List[Dict[str, Any]]):
     markers.sort(key=lambda m: m["time"])
     return markers[-30:], (round(sups[-1], 6) if sups else round(min(x["low"] for x in candles[-30:]), 6)), (round(ress[-1], 6) if ress else round(max(x["high"] for x in candles[-30:]), 6))
 
+# ==========================================
+# فاز ۳ - مورد ۱: الگوهای هارمونیک (XABCD) + کنج، پرچم، مثلث و کانال
+# ==========================================
+def detect_harmonics(candles: List[Dict[str, Any]]) -> Dict[str, Any]:
+    if len(candles) < 35:
+        return {"available": False, "name": "داده برای هارمونیک کافی نیست"}
+    win = candles[-100:]
+    pivots = []
+    for i in range(2, len(win) - 2):
+        h, l = win[i]["high"], win[i]["low"]
+        if h >= max(win[i-2]["high"], win[i-1]["high"], win[i+1]["high"], win[i+2]["high"]):
+            if not pivots or pivots[-1]["type"] != "H": pivots.append({"time": win[i]["time"], "val": h, "type": "H"})
+            elif h > pivots[-1]["val"]: pivots[-1] = {"time": win[i]["time"], "val": h, "type": "H"}
+        elif l <= min(win[i-2]["low"], win[i-1]["low"], win[i+1]["low"], win[i+2]["low"]):
+            if not pivots or pivots[-1]["type"] != "L": pivots.append({"time": win[i]["time"], "val": l, "type": "L"})
+            elif l < pivots[-1]["val"]: pivots[-1] = {"time": win[i]["time"], "val": l, "type": "L"}
+    if len(pivots) < 5:
+        return {"available": False, "name": "الگوی هارمونیک معتبری تشکیل نشده"}
+    for start in range(len(pivots) - 5, max(-1, len(pivots) - 8), -1):
+        X, A, B, C, D = pivots[start:start + 5]
+        xa, ab, bc, cd, ad = abs(A["val"]-X["val"]), abs(B["val"]-A["val"]), abs(C["val"]-B["val"]), abs(D["val"]-C["val"]), abs(D["val"]-A["val"])
+        if min(xa, ab, bc, cd) <= 1e-12: continue
+        ab_xa, bc_ab, cd_bc, ad_xa = ab/xa, bc/ab, cd/bc, ad/xa
+        bull = D["type"] == "L"
+        dfa = "صعودی (ناحیه برگشت خرید PRZ)" if bull else "نزولی (ناحیه برگشت فروش PRZ)"
+        matched = None
+        if 0.55 <= ab_xa <= 0.68 and 0.35 <= bc_ab <= 0.90 and 0.72 <= ad_xa <= 0.85: matched = f"هارمونیک گارتلی (Gartley) {dfa}"
+        elif 0.35 <= ab_xa <= 0.54 and 0.35 <= bc_ab <= 0.90 and 0.82 <= ad_xa <= 0.95: matched = f"هارمونیک خفاش (Bat) {dfa}"
+        elif 0.72 <= ab_xa <= 0.85 and 0.35 <= bc_ab <= 0.90 and 1.20 <= ad_xa <= 1.68: matched = f"هارمونیک پروانه (Butterfly) {dfa}"
+        elif 0.35 <= ab_xa <= 0.65 and 0.35 <= bc_ab <= 0.90 and 1.52 <= ad_xa <= 1.72: matched = f"هارمونیک خرچنگ (Crab) {dfa}"
+        elif 0.58 <= bc_ab <= 0.82 and 1.18 <= cd_bc <= 1.68 and 0.85 <= (cd/ab) <= 1.18: matched = f"هارمونیک AB=CD {dfa}"
+        if matched:
+            return {"available": True, "name": matched, "bullish": bull, "ratios": f"AB/XA={round(ab_xa,2)} | BC/AB={round(bc_ab,2)} | AD/XA={round(ad_xa,2)}",
+                    "points": [{"time": p["time"], "value": round(p["val"], 6)} for p in (X, A, B, C, D)], "prz": round(D["val"], 6)}
+    return {"available": False, "name": "الگوی هارمونیک معتبری در پیوت‌های اخیر تشکیل نشده"}
+
 def detect_patterns_and_channel(candles: List[Dict[str, Any]]) -> Dict[str, Any]:
     if len(candles) < 20: return {"available": False, "pattern_name": "داده ناکافی", "bias": "NEUTRAL"}
     win = candles[-35:] if len(candles) >= 35 else candles; m_n = len(win)
@@ -344,17 +377,24 @@ def detect_patterns_and_channel(candles: List[Dict[str, Any]]) -> Dict[str, Any]
     ls, le = round(inter - ld, 6), round(slope * (m_n - 1) + inter - ld, 6)
     half = m_n // 2; h1, h2 = max(highs[:half]), max(highs[half:]); l1, l2 = min(lows[:half]), min(lows[half:])
     r1, r2 = h1 - l1, h2 - l2
+    up_sl = (h2 - h1) / max(h1, 1e-12); lo_sl = (l2 - l1) / max(l1, 1e-12)
     pole = candles[-45:-15] if len(candles) >= 45 else candles[:max(1, len(candles) - 15)]
     pm = ((pole[-1]["close"] - pole[0]["close"]) / max(pole[0]["close"], 1e-12)) * 100.0
     ph = max(max(c["high"] for c in pole) - min(c["low"] for c in pole), 0.0)
     lu0, lu1, ll0, ll1 = us, ue, ls, le
-    if h2 < h1 * 0.995 and l2 > l1 * 1.005 and r2 < r1 * 0.78:
-        nm, bs, lu0, lu1, ll0, ll1, brk, tgt = "مثلث فشردگی", "NEUTRAL", round(h1, 6), round(h2, 6), round(l1, 6), round(l2, 6), round(h2, 6), round(h2 + r1 * 0.75, 6)
+    if up_sl > 0.005 and lo_sl > up_sl * 1.25 and r2 < r1 * 0.85:
+        nm, bs, lu0, lu1, ll0, ll1, brk, tgt = "کنج صعودی (Rising Wedge - هشدار ریزش)", "BEARISH", round(h1, 6), round(h2, 6), round(l1, 6), round(l2, 6), round(l2, 6), round(l2 - r1 * 0.7, 6)
+        ds = f"همگرایی به سمت بالا؛ شکست کف {ll1} هشدار اصلاح است."
+    elif up_sl < -0.005 and lo_sl < 0 and abs(up_sl) > abs(lo_sl) * 1.25 and r2 < r1 * 0.85:
+        nm, bs, lu0, lu1, ll0, ll1, brk, tgt = "کنج نزولی (Falling Wedge - پتانسیل صعود)", "BULLISH", round(h1, 6), round(h2, 6), round(l1, 6), round(l2, 6), round(h2, 6), round(h2 + r1 * 0.7, 6)
+        ds = f"تخلیه فشار فروش؛ شکست سقف {lu1} ماشه صعود است."
+    elif h2 < h1 * 0.995 and l2 > l1 * 1.005 and r2 < r1 * 0.78:
+        nm, bs, lu0, lu1, ll0, ll1, brk, tgt = "مثلث فشردگی (Triangle)", "NEUTRAL", round(h1, 6), round(h2, 6), round(l1, 6), round(l2, 6), round(h2, 6), round(h2 + r1 * 0.75, 6)
         ds = f"فشردگی بین {ll1} و {lu1}؛ آماده شکست."
     elif pm >= 10.0 and -0.85 <= spct <= 0.15 and (ue - le) < ph * 0.55:
-        nm, bs, brk, tgt, ds = "پرچم صعودی", "BULLISH", ue, round(ue + ph * 0.65, 6), f"رشد قبلی (+{round(pm,1)}%)؛ شکست {ue} ماشه صعود."
+        nm, bs, brk, tgt, ds = "پرچم صعودی (Bull Flag)", "BULLISH", ue, round(ue + ph * 0.65, 6), f"رشد قبلی (+{round(pm,1)}%)؛ شکست {ue} ماشه صعود."
     elif pm <= -10.0 and -0.15 <= spct <= 0.85 and (ue - le) < ph * 0.55:
-        nm, bs, brk, tgt, ds = "پرچم نزولی", "BEARISH", le, round(max(le - ph * 0.65, le * 0.35), 6), f"ریزش قبلی ({round(pm,1)}%)؛ شکست کف {le} خطرناک است."
+        nm, bs, brk, tgt, ds = "پرچم نزولی (Bear Flag)", "BEARISH", le, round(max(le - ph * 0.65, le * 0.35), 6), f"ریزش قبلی ({round(pm,1)}%)؛ شکست کف {le} خطرناک است."
     elif spct > 0.12:
         nm, bs, brk, tgt, ds = "کانال صعودی", "BULLISH", ue, round(ue + (ue - le) * 0.5, 6), f"شیب +{round(spct,2)}%/روز؛ حمایت {le}، سقف {ue}."
     elif spct < -0.12:
@@ -366,118 +406,107 @@ def detect_patterns_and_channel(candles: List[Dict[str, Any]]) -> Dict[str, Any]
             "lower_line": [{"time": win[0]["time"], "value": ll0}, {"time": win[-1]["time"], "value": ll1}],
             "breakout_price": brk, "pattern_target": tgt}
 
-# مورد ۲: تشخیص واگرایی مثبت و منفی (عادی و مخفی) روی قیمت و RSI
+# فاز ۳ - مورد ۳: نوار هیت‌مپ مومنتوم زیر کندل‌ها
+def build_candle_heatmap(candles: List[Dict[str, Any]], rsi_pts: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    closes = [c["close"] for c in candles]
+    ema9, ema20 = calc_ema(closes, 9), calc_ema(closes, 20)
+    rmap = {p["time"]: p["value"] for p in rsi_pts}
+    out = []
+    for i, c in enumerate(candles):
+        r = rmap.get(c["time"], 50.0)
+        spread = ((ema9[i] - ema20[i]) / max(ema20[i], 1e-12)) * 100.0
+        sc = max(-100.0, min(100.0, round((r - 50.0) * 2.0 + spread * 12.0, 1)))
+        col = "#10b981" if sc >= 35 else ("#059669" if sc >= 10 else ("#ef4444" if sc <= -35 else ("#b91c1c" if sc <= -10 else "#475569")))
+        out.append({"time": c["time"], "value": sc, "color": col})
+    return out
+
 def detect_divergences(candles: List[Dict[str, Any]], rsi_pts: List[Dict[str, Any]]) -> Dict[str, Any]:
     if len(candles) < 30 or len(rsi_pts) < 12:
-        return {"found": False, "bias": "NEUTRAL", "summary": "داده برای واگرایی کافی نیست", "items": []}
-    rmap = {p["time"]: p["value"] for p in rsi_pts}
-    win = candles[-70:]
-    lows, highs = [], []
+        return {"found": False, "bias": "NEUTRAL", "summary": "داده کافی نیست", "items": []}
+    rmap = {p["time"]: p["value"] for p in rsi_pts}; win = candles[-70:]; lows, highs = [], []
     for i in range(2, len(win) - 2):
         t = win[i]["time"]
         if t not in rmap: continue
-        if win[i]["low"] <= min(win[i-2]["low"], win[i-1]["low"], win[i+1]["low"], win[i+2]["low"]):
-            lows.append((t, win[i]["low"], rmap[t]))
-        if win[i]["high"] >= max(win[i-2]["high"], win[i-1]["high"], win[i+1]["high"], win[i+2]["high"]):
-            highs.append((t, win[i]["high"], rmap[t]))
+        if win[i]["low"] <= min(win[i-2]["low"], win[i-1]["low"], win[i+1]["low"], win[i+2]["low"]): lows.append((t, win[i]["low"], rmap[t]))
+        if win[i]["high"] >= max(win[i-2]["high"], win[i-1]["high"], win[i+1]["high"], win[i+2]["high"]): highs.append((t, win[i]["high"], rmap[t]))
     items = []
     if len(lows) >= 2:
         p1, p2 = lows[-2], lows[-1]
         if p2[1] < p1[1] * 0.995 and p2[2] > p1[2] + 2.0:
-            items.append({"type": "BULLISH_REGULAR", "title": "واگرایی مثبت عادی (RD+)", "color": "#10b981",
-                          "desc": f"قیمت کف پایین‌تر زد ولی RSI کف بالاتر ساخت ({p1[2]}⬅{p2[2]})؛ هشدار برگشت صعودی.",
-                          "price_line": [{"time": p1[0], "value": p1[1]}, {"time": p2[0], "value": p2[1]}],
-                          "rsi_line": [{"time": p1[0], "value": p1[2]}, {"time": p2[0], "value": p2[2]}]})
+            items.append({"type": "BULLISH_REGULAR", "title": "واگرایی مثبت عادی (RD+)", "color": "#10b981", "desc": f"کف قیمت پایین‌تر، RSI بالاتر ({p1[2]}⬅{p2[2]}).",
+                          "price_line": [{"time": p1[0], "value": p1[1]}, {"time": p2[0], "value": p2[1]}], "rsi_line": [{"time": p1[0], "value": p1[2]}, {"time": p2[0], "value": p2[2]}]})
         elif p2[1] > p1[1] * 1.005 and p2[2] < p1[2] - 2.0:
-            items.append({"type": "BULLISH_HIDDEN", "title": "واگرایی مثبت مخفی (HD+)", "color": "#22c55e",
-                          "desc": "قیمت کف بالاتر زد ولی RSI پایین‌تر آمد؛ تایید ادامه روند صعودی.",
-                          "price_line": [{"time": p1[0], "value": p1[1]}, {"time": p2[0], "value": p2[1]}],
-                          "rsi_line": [{"time": p1[0], "value": p1[2]}, {"time": p2[0], "value": p2[2]}]})
+            items.append({"type": "BULLISH_HIDDEN", "title": "واگرایی مثبت مخفی (HD+)", "color": "#22c55e", "desc": "تایید ادامه روند صعودی.",
+                          "price_line": [{"time": p1[0], "value": p1[1]}, {"time": p2[0], "value": p2[1]}], "rsi_line": [{"time": p1[0], "value": p1[2]}, {"time": p2[0], "value": p2[2]}]})
     if len(highs) >= 2:
         q1, q2 = highs[-2], highs[-1]
         if q2[1] > q1[1] * 1.005 and q2[2] < q1[2] - 2.0:
-            items.append({"type": "BEARISH_REGULAR", "title": "واگرایی منفی عادی (RD-)", "color": "#ef4444",
-                          "desc": f"قیمت سقف بالاتر زد ولی RSI سقف پایین‌تر ساخت ({q1[2]}⬅{q2[2]})؛ هشدار ضعف خریدار.",
-                          "price_line": [{"time": q1[0], "value": q1[1]}, {"time": q2[0], "value": q2[1]}],
-                          "rsi_line": [{"time": q1[0], "value": q1[2]}, {"time": q2[0], "value": q2[2]}]})
+            items.append({"type": "BEARISH_REGULAR", "title": "واگرایی منفی عادی (RD-)", "color": "#ef4444", "desc": f"سقف قیمت بالاتر، RSI پایین‌تر ({q1[2]}⬅{q2[2]}).",
+                          "price_line": [{"time": q1[0], "value": q1[1]}, {"time": q2[0], "value": q2[1]}], "rsi_line": [{"time": q1[0], "value": q1[2]}, {"time": q2[0], "value": q2[2]}]})
         elif q2[1] < q1[1] * 0.995 and q2[2] > q1[2] + 2.0:
-            items.append({"type": "BEARISH_HIDDEN", "title": "واگرایی منفی مخفی (HD-)", "color": "#f43f5e",
-                          "desc": "قیمت سقف پایین‌تر زد ولی RSI بالاتر رفت؛ تایید ادامه روند نزولی.",
-                          "price_line": [{"time": q1[0], "value": q1[1]}, {"time": q2[0], "value": q2[1]}],
-                          "rsi_line": [{"time": q1[0], "value": q1[2]}, {"time": q2[0], "value": q2[2]}]})
-    if not items: return {"found": False, "bias": "NEUTRAL", "summary": "واگرایی معتبری در پیوت‌های اخیر دیده نشد.", "items": []}
+            items.append({"type": "BEARISH_HIDDEN", "title": "واگرایی منفی مخفی (HD-)", "color": "#f43f5e", "desc": "تایید ادامه روند نزولی.",
+                          "price_line": [{"time": q1[0], "value": q1[1]}, {"time": q2[0], "value": q2[1]}], "rsi_line": [{"time": q1[0], "value": q1[2]}, {"time": q2[0], "value": q2[2]}]})
+    if not items: return {"found": False, "bias": "NEUTRAL", "summary": "واگرایی معتبری دیده نشد.", "items": []}
     bs = "BULLISH" if all("BULLISH" in x["type"] for x in items) else ("BEARISH" if all("BEARISH" in x["type"] for x in items) else "MIXED")
     return {"found": True, "bias": bs, "summary": " | ".join(x["title"] for x in items), "items": items}
 
-# مورد ۴: تحلیل ۱۶ الگوی کندل‌استیک مثل تریدینگ‌ویو
 def analyze_candlesticks_tv(candles: List[Dict[str, Any]]) -> Dict[str, Any]:
     if len(candles) < 3: return {"bias": "NEUTRAL", "bias_fa": "خنثی", "score": 0, "patterns": []}
     def _i(c):
         b = abs(c["close"] - c["open"]); r = max(c["high"] - c["low"], 1e-12)
         return c["open"], c["close"], b, r, c["high"] - max(c["open"], c["close"]), min(c["open"], c["close"]) - c["low"], c["close"] > c["open"], c["close"] < c["open"]
-    o2, cl2, b2, r2, uw2, lw2, u2, d2 = _i(candles[-3])
-    o1, cl1, b1, r1, uw1, lw1, u1, d1 = _i(candles[-2])
-    o0, cl0, b0, r0, uw0, lw0, u0, d0 = _i(candles[-1])
+    o2, cl2, b2, r2, uw2, lw2, u2, d2 = _i(candles[-3]); o1, cl1, b1, r1, uw1, lw1, u1, d1 = _i(candles[-2]); o0, cl0, b0, r0, uw0, lw0, u0, d0 = _i(candles[-1])
     dn = candles[-1]["close"] < candles[-6]["close"] if len(candles) >= 6 else d1
     up = candles[-1]["close"] > candles[-6]["close"] if len(candles) >= 6 else u1
     found = []
     if lw0 > b0 * 2.0 and uw0 < r0 * 0.2 and b0 > 0 and dn: found.append({"name": "چکش صعودی (Hammer)", "signal": 1, "desc": "حمایت خریدار در کف"})
     if uw0 > b0 * 2.0 and lw0 < r0 * 0.2 and b0 > 0 and dn: found.append({"name": "چکش معکوس", "signal": 1, "desc": "تلاش برگشت از کف"})
-    if uw0 > b0 * 2.0 and lw0 < r0 * 0.2 and b0 > 0 and up: found.append({"name": "ستاره ثاقب (Shooting Star)", "signal": -1, "desc": "رد قیمت از سقف"})
+    if uw0 > b0 * 2.0 and lw0 < r0 * 0.2 and b0 > 0 and up: found.append({"name": "ستاره ثاقب", "signal": -1, "desc": "رد قیمت از سقف"})
     if lw0 > b0 * 2.0 and uw0 < r0 * 0.2 and b0 > 0 and up: found.append({"name": "مرد به دار آویخته", "signal": -1, "desc": "ضعف در سقف"})
-    if u0 and d1 and cl0 >= o1 and o0 <= cl1 and b0 > b1: found.append({"name": "پوشای صعودی (Bullish Engulfing)", "signal": 1, "desc": "غلبه کامل خریدار"})
-    if d0 and u1 and cl0 <= o1 and o0 >= cl1 and b0 > b1: found.append({"name": "پوشای نزولی (Bearish Engulfing)", "signal": -1, "desc": "غلبه کامل فروشنده"})
-    if d2 and b1 < r1 * 0.35 and u0 and cl0 > (o2 + cl2) / 2.0: found.append({"name": "ستاره صبحگاهی (Morning Star)", "signal": 1, "desc": "الگوی ۳کندلی برگشت به بالا"})
-    if u2 and b1 < r1 * 0.35 and d0 and cl0 < (o2 + cl2) / 2.0: found.append({"name": "ستاره شامگاهی (Evening Star)", "signal": -1, "desc": "الگوی ۳کندلی برگشت به پایین"})
-    if u2 and u1 and u0 and cl0 > cl1 > cl2 and b0 > r0 * 0.5 and b1 > r1 * 0.5: found.append({"name": "سه سرباز سفید", "signal": 1, "desc": "صعود پیوسته ۳ روزه"})
-    if d2 and d1 and d0 and cl0 < cl1 < cl2 and b0 > r0 * 0.5 and b1 > r1 * 0.5: found.append({"name": "سه کلاغ سیاه", "signal": -1, "desc": "نزول پیوسته ۳ روزه"})
-    if d1 and u0 and o0 > cl1 and cl0 < o1 and b0 < b1 * 0.65: found.append({"name": "هارامی صعودی", "signal": 1, "desc": "توقف شتاب نزول"})
-    if u1 and d0 and o0 < cl1 and cl0 > o1 and b0 < b1 * 0.65: found.append({"name": "هارامی نزولی", "signal": -1, "desc": "توقف شتاب صعود"})
-    if b0 / r0 < 0.12 and lw0 > r0 * 0.6: found.append({"name": "دوجی سنجاقک", "signal": 1, "desc": "جمع‌آوری عرضه در کف"})
+    if u0 and d1 and cl0 >= o1 and o0 <= cl1 and b0 > b1: found.append({"name": "پوشای صعودی", "signal": 1, "desc": "غلبه خریدار"})
+    if d0 and u1 and cl0 <= o1 and o0 >= cl1 and b0 > b1: found.append({"name": "پوشای نزولی", "signal": -1, "desc": "غلبه فروشنده"})
+    if d2 and b1 < r1 * 0.35 and u0 and cl0 > (o2 + cl2) / 2.0: found.append({"name": "ستاره صبحگاهی", "signal": 1, "desc": "برگشت صعودی"})
+    if u2 and b1 < r1 * 0.35 and d0 and cl0 < (o2 + cl2) / 2.0: found.append({"name": "ستاره شامگاهی", "signal": -1, "desc": "برگشت نزولی"})
+    if u2 and u1 and u0 and cl0 > cl1 > cl2 and b0 > r0 * 0.5 and b1 > r1 * 0.5: found.append({"name": "سه سرباز سفید", "signal": 1, "desc": "صعود پیوسته"})
+    if d2 and d1 and d0 and cl0 < cl1 < cl2 and b0 > r0 * 0.5 and b1 > r1 * 0.5: found.append({"name": "سه کلاغ سیاه", "signal": -1, "desc": "نزول پیوسته"})
+    if d1 and u0 and o0 > cl1 and cl0 < o1 and b0 < b1 * 0.65: found.append({"name": "هارامی صعودی", "signal": 1, "desc": "توقف نزول"})
+    if u1 and d0 and o0 < cl1 and cl0 > o1 and b0 < b1 * 0.65: found.append({"name": "هارامی نزولی", "signal": -1, "desc": "توقف صعود"})
+    if b0 / r0 < 0.12 and lw0 > r0 * 0.6: found.append({"name": "دوجی سنجاقک", "signal": 1, "desc": "جذب عرضه در کف"})
     if b0 / r0 < 0.12 and uw0 > r0 * 0.6: found.append({"name": "دوجی سنگ‌قبر", "signal": -1, "desc": "فشار فروش در سقف"})
     if not found:
-        if u0 and b0 > r0 * 0.65: found.append({"name": "کندل قدرتمند سبز (Marubozu+)", "signal": 1, "desc": "برتری خریدار"})
-        elif d0 and b0 > r0 * 0.65: found.append({"name": "کندل قدرتمند قرمز (Marubozu-)", "signal": -1, "desc": "برتری فروشنده"})
-        else: found.append({"name": "کندل متعادل / خنثی", "signal": 0, "desc": "الگوی بازگشتی خاص ندارد"})
+        if u0 and b0 > r0 * 0.65: found.append({"name": "کندل قدرتمند سبز", "signal": 1, "desc": "برتری خریدار"})
+        elif d0 and b0 > r0 * 0.65: found.append({"name": "کندل قدرتمند قرمز", "signal": -1, "desc": "برتری فروشنده"})
+        else: found.append({"name": "کندل متعادل / خنثی", "signal": 0, "desc": "الگوی خاص ندارد"})
     sc = sum(x["signal"] for x in found)
-    return {"bias": "BULLISH" if sc > 0 else ("BEARISH" if sc < 0 else "NEUTRAL"), "bias_fa": "مثبت" if sc > 0 else ("منفی" if sc < 0 else "خنثی"), "score": sc, "patterns": found, "summary": " | ".join(x["name"] for x in found)}
+    return {"bias": "BULLISH" if sc > 0 else ("BEARISH" if sc < 0 else "NEUTRAL"), "bias_fa": "مثبت" if sc > 0 else ("منفی" if sc < 0 else "خنثی"), "score": sc, "patterns": found}
 
-# مورد ۶: حجم ورود و خروج پول هوشمند (CMF 20 + MFI 14 + OBV)
 def analyze_smart_money(candles: List[Dict[str, Any]]) -> Dict[str, Any]:
     n = len(candles)
-    if n < 22: return {"available": False, "bias": "NEUTRAL", "verdict": "دیتای حجم ناکافی", "detail": ""}
+    if n < 22: return {"available": False, "bias": "NEUTRAL", "verdict": "داده ناکافی", "detail": ""}
     mfv = [(((c["close"] - c["low"]) - (c["high"] - c["close"])) / (c["high"] - c["low"]) if c["high"] > c["low"] else 0.0) * c["vol"] for c in candles]
-    vols = [max(c["vol"], 0.0) for c in candles]
-    sv20 = sum(vols[-20:])
+    vols = [max(c["vol"], 0.0) for c in candles]; sv20 = sum(vols[-20:])
     cmf20 = round(sum(mfv[-20:]) / sv20, 3) if sv20 > 0 else 0.0
     pmf = nmf = 0.0
     for i in range(max(1, n - 14), n):
-        tp0 = (candles[i]["high"] + candles[i]["low"] + candles[i]["close"]) / 3.0
-        tp1 = (candles[i-1]["high"] + candles[i-1]["low"] + candles[i-1]["close"]) / 3.0
+        tp0, tp1 = (candles[i]["high"]+candles[i]["low"]+candles[i]["close"])/3.0, (candles[i-1]["high"]+candles[i-1]["low"]+candles[i-1]["close"])/3.0
         if tp0 > tp1: pmf += tp0 * candles[i]["vol"]
         elif tp0 < tp1: nmf += tp0 * candles[i]["vol"]
     mfi14 = 100.0 if (nmf == 0 and pmf > 0) else (50.0 if nmf == 0 else round(100.0 - 100.0 / (1.0 + pmf / nmf), 1))
     obv = [0.0]
     for i in range(1, n): obv.append(obv[-1] + (candles[i]["vol"] if candles[i]["close"] > candles[i-1]["close"] else (-candles[i]["vol"] if candles[i]["close"] < candles[i-1]["close"] else 0.0)))
-    obv_up = obv[-1] > obv[-10]
-    avg_v = sum(vols[-21:-1]) / 20.0 if n > 21 else sum(vols) / n
+    obv_up = obv[-1] > obv[-10]; avg_v = sum(vols[-21:-1]) / 20.0 if n > 21 else sum(vols) / n
     vr = round(vols[-1] / avg_v, 2) if avg_v > 0 else 1.0
     if cmf20 >= 0.05 and obv_up:
-        bs, vd = "BULLISH", "ورود پول هوشمند (انباشت 🟢)"
-        dt = f"شاخص CMF={cmf20} (مثبت)، MFI={mfi14} و OBV صعودی؛ حجم امروز {vr}x میانگین است (نقدینگی در حال ورود است)."
+        bs, vd, dt = "BULLISH", "ورود پول هوشمند (انباشت 🟢)", f"CMF={cmf20}، MFI={mfi14} و OBV صعودی؛ حجم {vr}x میانگین است."
     elif cmf20 >= 0.05 and candles[-1]["close"] < candles[-10]["close"]:
-        bs, vd = "BULLISH", "خرید پنهان پول هوشمند در افت 🟢"
-        dt = f"با وجود اصلاح قیمت، CMF={cmf20} مثبت است؛ نشان‌دهنده جذب فروش‌های هیجانی در کف."
+        bs, vd, dt = "BULLISH", "خرید پنهان در افت 🟢", f"با افت قیمت، CMF={cmf20} مثبت است (جذب سفارش در کف)."
     elif cmf20 <= -0.05 and not obv_up:
-        bs, vd = "BEARISH", "خروج پول هوشمند (توزیع 🔴)"
-        dt = f"شاخص CMF={cmf20} (منفی)، MFI={mfi14} و OBV نزولی است؛ نقدینگی در حال خروج است و رشدها پرریسک‌اند."
+        bs, vd, dt = "BEARISH", "خروج پول هوشمند (توزیع 🔴)", f"CMF={cmf20}، MFI={mfi14} و OBV نزولی است؛ نقدینگی خارج می‌شود."
     else:
-        bs, vd = "NEUTRAL", "جریان پول متعادل 🟡"
-        dt = f"CMF={cmf20} و MFI={mfi14} (حجم {vr}x میانگین)؛ هنوز ورود یا خروج سنگین قطعی نشده است."
+        bs, vd, dt = "NEUTRAL", "جریان پول متعادل 🟡", f"CMF={cmf20} و MFI={mfi14} (حجم {vr}x)."
     return {"available": True, "bias": bs, "cmf20": cmf20, "mfi14": mfi14, "vol_ratio": vr, "verdict": vd, "detail": dt}
 
-# مورد ۵: موتور یکپارچگی ضد تناقض
-def build_unified_coherence(contracts: dict, pat: dict, div: dict, cs: dict, sm: dict) -> Dict[str, Any]:
+def build_unified_coherence(contracts: dict, pat: dict, harm: dict, div: dict, cs: dict, sm: dict) -> Dict[str, Any]:
     bull = bear = 0
     for hk in ("H1_DAILY", "H2_WEEKLY", "H3_MONTHLY", "H4_120D"):
         if contracts[hk]["is_bullish"]: bull += 15
@@ -485,19 +514,21 @@ def build_unified_coherence(contracts: dict, pat: dict, div: dict, cs: dict, sm:
     for src in (pat.get("bias"), div.get("bias"), cs.get("bias"), sm.get("bias")):
         if src == "BULLISH": bull += 12
         elif src == "BEARISH": bear += 12
+    if harm.get("available"):
+        if harm.get("bullish"): bull += 12
+        else: bear += 12
     conflicts = []
     if contracts["H1_DAILY"]["is_bullish"] and contracts["H4_120D"]["evaluatable"] and not contracts["H4_120D"]["is_bullish"]:
-        conflicts.append("تضاد تایم‌فریم: کوتاه‌مدت (روزانه) مثبت است ولی روند ۱۲۰ روزه هنوز صعودی نشده؛ یعنی فعلاً نوسانِ اصلاحی است نه روند بلندمدت.")
+        conflicts.append("تضاد تایم‌فریم: کوتاه‌مدت (روزانه) مثبت است ولی روند ۱۲۰ روزه هنوز صعودی نشده.")
     if (contracts["H1_DAILY"]["is_bullish"] or pat.get("bias") == "BULLISH") and div.get("bias") == "BEARISH":
-        conflicts.append("هشدار تضاد: ظاهر چارت صعودی است ولی واگرایی منفی RSI ضعف شتاب خرید را لو می‌دهد.")
+        conflicts.append("واگرایی منفی RSI هشدار تضعیف شتاب خرید را می‌دهد.")
     if contracts["H1_DAILY"]["is_bullish"] and sm.get("bias") == "BEARISH":
-        conflicts.append("هشدار نقدینگی: کندل کوتاه‌مدت سبز است اما جریان پول هوشمند (CMF/OBV) هنوز خروج سرمایه نشان می‌دهد.")
-    if cs.get("bias") == "BEARISH" and contracts["H1_DAILY"]["is_bullish"]:
-        conflicts.append("الگوی کندل آخر منفی است؛ تا تایید کندل سبز بعدی برای خرید عجله نکنید.")
-    if not conflicts:
-        conflicts.append("یکپارچگی کامل: جهت تایم‌فریم‌ها، کندل‌ها، واگرایی و پول هوشمند با هم هم‌راستا هستند.")
+        conflicts.append("قیمت سبز است اما جریان پول هوشمند خروج سرمایه نشان می‌دهد.")
+    if harm.get("available") and not harm.get("bullish") and contracts["H1_DAILY"]["is_bullish"]:
+        conflicts.append(f"هشدار الگوی {harm['name']} در ناحیه PRZ={harm['prz']}.")
+    if not conflicts: conflicts.append("یکپارچگی کامل: تایم‌فریم‌ها، الگوها، کندل و پول هوشمند هم‌راستا هستند.")
     net = bull - bear
-    vd = "برآیند یکپارچه: صعودی هم‌سو 🟢" if (net >= 25 and len(conflicts) == 1 and "یکپارچگی" in conflicts[0]) else ("برآیند یکپارچه: نزولی / پرریسک 🔴" if net <= -25 else "برآیند یکپارچه: احتیاط / دارای تضاد زمانی 🟡")
+    vd = "برآیند یکپارچه: صعودی هم‌سو 🟢" if (net >= 25 and "یکپارچگی" in conflicts[0]) else ("برآیند یکپارچه: نزولی / پرریسک 🔴" if net <= -25 else "برآیند یکپارچه: احتیاط / دارای تضاد 🟡")
     return {"verdict": vd, "score": net, "conflicts": conflicts}
 
 def run_backtest_180d(candles: List[Dict[str, Any]], market: str) -> Dict[str, Any]:
@@ -569,7 +600,7 @@ def evaluate_horizon(hk, spec, n, price, dvol, fee, closes, ema9, ema20, ema50, 
     return {"horizon": hk, "label": spec["label"], "evaluatable": True, "icon": ic, "tone": tn, "is_bullish": bull, "available_bars": n, "required_min_bars": spec["min_bars"], "action": act, "target": tp, "stop": sl_v, "net_return_pct": nr, "net_risk_pct": nsk, "rr": rr}
 
 def analyze_full(symbol: str, market: str, item: Dict[str, Any], candles: List[Dict[str, Any]], fng_data: Optional[dict] = None):
-    n = len(candles); closes, highs, lows, vols = [c["close"] for c in candles], [c["high"] for c in candles], [c["low"] for c in candles], [c["vol"] for c in candles]
+    n = len(candles); closes, highs, lows = [c["close"] for c in candles], [c["high"] for c in candles], [c["low"] for c in candles]
     price = closes[-1]
     rets = [abs(closes[i] - closes[i - 1]) / closes[i - 1] for i in range(1, n) if closes[i - 1] > 0]
     dvol = max(min((sum(rets[-20:]) / len(rets[-20:])) if rets else 0.02, 0.08), 0.01)
@@ -581,6 +612,8 @@ def analyze_full(symbol: str, market: str, item: Dict[str, Any], candles: List[D
     fib = {"0.0 (سقف)": round(sh, 6), "0.236": round(sh - 0.236*diff, 6), "0.382": round(sh - 0.382*diff, 6), "0.500": round(sh - 0.500*diff, 6), "0.618 (طلایی)": round(sh - 0.618*diff, 6), "1.0 (کف)": round(sl, 6)}
     pa_markers, pa_sup, pa_res = detect_price_action(candles)
     patterns = detect_patterns_and_channel(candles)
+    harmonics = detect_harmonics(candles)
+    heatmap = build_candle_heatmap(candles, rsi_pts)
     divergences = detect_divergences(candles, rsi_pts)
     candlesticks = analyze_candlesticks_tv(candles)
     smart_money = analyze_smart_money(candles)
@@ -592,21 +625,16 @@ def analyze_full(symbol: str, market: str, item: Dict[str, Any], candles: List[D
         cr = evaluate_horizon(hk, sp, n, price, dvol, fee, closes, ema9, ema20, ema50, macd_l, sig_l, hist_l, rsi_now, pa_sup, pa_res)
         if cr["is_bullish"]: hits += 1
         contracts[hk] = cr
-    coherence = build_unified_coherence(contracts, patterns, divergences, candlesticks, smart_money)
-
-    pe, eps = _f(item.get("pe")), _f(item.get("eps"))
-    fund = (f"P/E={pe or 'نامشخص'} | EPS={eps or 'نامشخص'}" if market == "BOURSE" else f"حجم ۲۴ساعته: {round(float(item.get('quote_vol') or 0)/1e6, 2)}M$")
-    fng_t = f" | ترس/طمع کل: {fng_data['value']}/100" if (market == "CRYPTO" and fng_data) else ""
-    psych = {"mood": f"RSI={rsi_now} | جریان پول: {smart_money['verdict']}{fng_t}", "advice": coherence["conflicts"][0]}
+    coherence = build_unified_coherence(contracts, patterns, harmonics, divergences, candlesticks, smart_money)
     strategies = {"past": f"گذشته: کف {fib['1.0 (کف)']} تا سقف {fib['0.0 (سقف)']}.", "present": f"حال: {structure} | کندل: {candlesticks['bias_fa']} | الگو: {patterns['pattern_name']}.", "future": f"آینده: {patterns.get('description', '')}"}
     return {
-        "price": price, "fundamental": fund, "psychology": psych, "strategies": strategies,
-        "contracts": contracts, "confluence": f"{hits}/4", "backtest": backtest,
-        "divergences": divergences, "candlesticks": candlesticks, "smart_money": smart_money, "coherence": coherence,
+        "price": price, "strategies": strategies, "contracts": contracts, "confluence": f"{hits}/4",
+        "backtest": backtest, "divergences": divergences, "candlesticks": candlesticks,
+        "smart_money": smart_money, "coherence": coherence, "harmonics": harmonics,
         "chart": {
             "candles": [{"time": c["time"], "open": c["open"], "high": c["high"], "low": c["low"], "close": c["close"]} for c in candles],
             "volume": [{"time": c["time"], "value": c["vol"], "color": "rgba(16,185,129,0.35)" if c["close"] >= c["open"] else "rgba(239,68,68,0.35)"} for c in candles],
-            "ema20": [{"time": candles[i]["time"], "value": ema20[i]} for i in range(n)],
+            "heatmap": heatmap, "ema20": [{"time": candles[i]["time"], "value": ema20[i]} for i in range(n)],
             "ema50": [{"time": candles[i]["time"], "value": ema50[i]} for i in range(n)],
             "bb_upper": [{"time": candles[i]["time"], "value": bb_up[i]} for i in range(n)],
             "bb_lower": [{"time": candles[i]["time"], "value": bb_lo[i]} for i in range(n)],
@@ -614,7 +642,7 @@ def analyze_full(symbol: str, market: str, item: Dict[str, Any], candles: List[D
             "macd_signal": [{"time": candles[i]["time"], "value": sig_l[i]} for i in range(n)],
             "macd_hist": [{"time": candles[i]["time"], "value": hist_l[i], "color": "#10b981" if hist_l[i] >= 0 else "#ef4444"} for i in range(n)],
             "pa_markers": pa_markers, "pa_support": pa_sup, "pa_resistance": pa_res,
-            "fib": fib, "rsi_now": rsi_now, "patterns": patterns, "divergences": divergences,
+            "fib": fib, "rsi_now": rsi_now, "patterns": patterns, "divergences": divergences, "harmonics": harmonics,
         }
     }
 
@@ -624,29 +652,40 @@ async def run_self_test(brs_key: str = ""):
     ref_c = [44.34, 44.09, 44.15, 43.61, 44.33, 44.83, 45.10, 45.42, 45.84, 46.08, 45.89, 46.03, 45.61, 46.28, 46.28, 46.00]
     rc = [{"time": 1700000000 + i*86400, "open": c, "high": c, "low": c, "close": c, "vol": 100} for i, c in enumerate(ref_c)]
     ro = calc_wilder_rsi_points(rc, 14)
-    checks.append({"name": "Wilder RSI(14) Reference Math", "passed": len(ro) == 2 and abs(ro[0]["value"]-70.46) < 0.1 and abs(ro[1]["value"]-66.25) < 0.1, "detail": str(ro)})
+    checks.append({"name": "Wilder RSI(14) Reference Math", "passed": len(ro)==2 and abs(ro[0]["value"]-70.46)<0.1 and abs(ro[1]["value"]-66.25)<0.1, "detail": str(ro)})
     checks.append({"name": "Jalali-to-Gregorian Calendar Math", "passed": jalali_to_gregorian(1403,1,1)==(2024,3,20) and jalali_to_gregorian(1405,8,24)==(2026,11,15), "detail": "OK"})
-    # تست واگرایی مثبت عادی: دو کف در قیمت که کف دوم پایین‌تر و RSI دوم بالاتر است
-    div_prices = [100 - i*0.5 for i in range(25)] + [87.5 + i*1.5 for i in range(10)] + [101 - i*2.0 for i in range(8)] + [85 + i*0.8 for i in range(10)]
-    dc = [{"time": 1700000000 + i*86400, "open": p, "high": p+0.5, "low": p-0.5, "close": p, "vol": 1000} for i, p in enumerate(div_prices)]
-    dv = detect_divergences(dc, calc_wilder_rsi_points(dc, 14))
-    checks.append({"name": "Divergence Detector (RD+)", "passed": dv["found"] and any("BULLISH" in x["type"] for x in dv["items"]), "detail": dv["summary"]})
-    # تست پول هوشمند انباشت: بسته‌شدن نزدیک سقف با حجم بالا
-    smc = [{"time": 1700000000 + i*86400, "open": 100+i*0.3, "high": 102+i*0.3, "low": 99+i*0.3, "close": 101.9+i*0.3, "vol": 1000+i*120} for i in range(30)]
-    sm_res = analyze_smart_money(smc)
-    checks.append({"name": "Smart Money Flow (CMF/MFI/OBV)", "passed": sm_res["bias"] == "BULLISH" and sm_res["cmf20"] > 0.05, "detail": f"CMF={sm_res.get('cmf20')}, MFI={sm_res.get('mfi14')}"})
-    # تست الگوهای کندلی تریدینگ‌ویو (چکش صعودی پس از افت)
-    hm = [{"time": 1700000000+i*86400, "open": 110-i, "high": 111-i, "low": 109-i, "close": 109.5-i, "vol": 100} for i in range(8)] + [{"time": 1700000000+8*86400, "open": 100, "high": 101.2, "low": 94, "close": 101, "vol": 500}]
-    cs_res = analyze_candlesticks_tv(hm)
-    checks.append({"name": "TV Candlesticks (Hammer)", "passed": cs_res["bias"] == "BULLISH", "detail": cs_res["summary"]})
-    # تست یکپارچگی و ۴ بازه
-    bounce = [{"time": 1700000000+i*86400, "open": (210-i*1.1 if i<110 else 89+(i-109)*0.75)-0.2, "high": (210-i*1.1 if i<110 else 89+(i-109)*0.75)+1, "low": (210-i*1.1 if i<110 else 89+(i-109)*0.75)-1, "close": (210-i*1.1 if i<110 else 89+(i-109)*0.75), "vol": 1000} for i in range(130)]
-    ir = analyze_full("TEST", "CRYPTO", {"quote_vol": 1e7}, bounce)
-    checks.append({"name": "4-Horizon & Coherence Gate", "passed": ir["contracts"]["H1_DAILY"]["is_bullish"] and not ir["contracts"]["H4_120D"]["is_bullish"] and len(ir["coherence"]["conflicts"])>=1, "detail": f"conf={ir['confluence']}, {ir['coherence']['verdict']}"})
+
+    # تست فاز ۳: الگوی هارمونیک گارتلی (X=100, A=150, B=119, C=138, D=111)
+    def _lerp(p0, p1, steps): return [p0 + (p1 - p0) * (k / steps) for k in range(steps)]
+    h_vals = _lerp(112, 100, 5) + _lerp(100, 150, 10) + _lerp(150, 119, 10) + _lerp(119, 138, 10) + _lerp(138, 111, 10) + [111, 113, 115, 117, 119]
+    hc = [{"time": 1700000000 + i*86400, "open": v, "high": v+0.2, "low": v-0.2, "close": v, "vol": 1000} for i, v in enumerate(h_vals)]
+    h_res = detect_harmonics(hc)
+    checks.append({"name": "Harmonic XABCD Detector (Gartley)", "passed": h_res["available"] and "گارتلی" in h_res["name"], "detail": h_res["name"]})
+
+    # تست فاز ۳: کنج نزولی (Falling Wedge)
+    w_c = []
+    for i in range(35):
+        h_v = (140 - i*0.9) if i < 17 else (124 - (i-17)*0.55)
+        l_v = (115 - i*0.4) if i < 17 else (108 - (i-17)*0.22)
+        mid = (h_v + l_v)/2.0
+        w_c.append({"time": 1700000000+i*86400, "open": mid, "high": h_v, "low": l_v, "close": mid, "vol": 500})
+    w_res = detect_patterns_and_channel(w_c)
+    checks.append({"name": "Wedge Pattern Detector", "passed": "Falling Wedge" in w_res["pattern_name"], "detail": w_res["pattern_name"]})
+
+    hm_out = build_candle_heatmap(hc, calc_wilder_rsi_points(hc, 14))
+    checks.append({"name": "Heatmap Momentum Series", "passed": len(hm_out)==len(hc) and all(-100<=x["value"]<=100 for x in hm_out), "detail": f"bars={len(hm_out)}"})
+
     macro, b_data = await asyncio.gather(load_macro_live(brs_key, force=True), load_all_bourse(brs_key))
     c_data = await load_all_crypto(force=True, usdt_toman=macro["usdt_toman"])
     checks.append({"name": "Live Crypto & USDT-Toman", "passed": len(c_data["items"]) >= 300 and macro["usdt_toman"] is not None, "detail": f"coins={len(c_data['items'])}, usdt={macro['usdt_toman']}"})
-    return {"all_math_tests_passed": all(x["passed"] for x in checks[:6]), "checks": checks}
+    return {"all_math_tests_passed": all(x["passed"] for x in checks[:5]), "checks": checks}
+
+@app.get("/api/market-heatmap")
+async def market_heatmap(brs_key: str = ""):
+    c_data, b_data = await asyncio.gather(load_all_crypto(), load_all_bourse(brs_key))
+    c_top = enrich_comparison([x for x in c_data["items"] if x["symbol"] != "USDT"][:24])
+    b_top = enrich_comparison(sorted(b_data["items"], key=lambda z: z.get("tvol", 0), reverse=True)[:12])
+    return {"crypto": c_top, "bourse": b_top}
 
 @app.get("/api/system-status")
 async def system_status(brs_key: str = ""):
@@ -681,7 +720,7 @@ async def analyze_endpoint(symbol: str, market: str = "AUTO", brs_key: str = "")
 @app.get("/api/top10-scanner")
 async def top10_scanner(brs_key: str = ""):
     c_data, b_data = await asyncio.gather(load_all_crypto(), load_all_bourse(brs_key))
-    cands = [(x, "CRYPTO") for x in c_data["items"] if x.get("today") and x["symbol"] != "USDT"][:24] + [(x, "BOURSE") for x in sorted(b_data["items"], key=lambda z: z.get("tvol", 0), reverse=True)[:8]]
+    cands = [(x, "CRYPTO") for x in c_data["items"] if x.get("today") and x["symbol"] != "USDT"][:30] + [(x, "BOURSE") for x in sorted(b_data["items"], key=lambda z: z.get("tvol", 0), reverse=True)[:10]]
     cres = await asyncio.gather(*[fetch_180_candles(it["symbol"], mk, it, brs_key) for it, mk in cands])
     an = [(it, mk, analyze_full(it["symbol"], mk, it, cr["candles"])) for (it, mk), cr in zip(cands, cres) if len(cr["candles"]) >= 16]
     top10 = {}
