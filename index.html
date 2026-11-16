@@ -3,436 +3,199 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ترمینال تحلیل کندل‌استیک + الگوهای خودکار و بک‌تست</title>
+  <title>فاز ۲ | واگرایی، کندل‌شناسی، پول هوشمند و یکپارچگی</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lightweight-charts@4.2.1/dist/lightweight-charts.standalone.production.js"></script>
   <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet" />
-  <style>
-    body{font-family:'Vazirmatn',sans-serif;background:#090e1a;color:#e2e8f0}
-    .card{background:#111827;border:1px solid #1f2937;border-radius:14px}
-    .ind-btn{transition:all .15s;border:1px solid #334155}
-    .ind-on{background:#059669;border-color:#10b981;color:#fff;font-weight:bold}
-    .ind-off{background:#1e293b;color:#94a3b8}
-  </style>
+  <style>body{font-family:'Vazirmatn',sans-serif;background:#090e1a;color:#e2e8f0}.card{background:#111827;border:1px solid #1f2937;border-radius:14px}.ind-btn{border:1px solid #334155}.ind-on{background:#059669;border-color:#10b981;color:#fff;font-weight:bold}.ind-off{background:#1e293b;color:#94a3b8}</style>
 </head>
-<body class="p-3 md:p-6 max-w-7xl mx-auto space-y-5">
-
+<body class="p-3 md:p-6 max-w-7xl mx-auto space-y-4">
   <header class="card p-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
-    <div>
-      <h1 class="text-xl font-bold text-emerald-400">ترمینال تحلیل تکنیکال، الگوهای خودکار و بک‌تست</h1>
-      <p class="text-xs text-slate-400">کانال و پرچم خودکار | بک‌تست ۱۸۰ روزه | نمای دوحالته ۲×۲ | ۱۰ برتر هر بازه</p>
-    </div>
-    <div class="flex flex-wrap items-center gap-2">
-      <button onclick="runSelfTest()" class="bg-sky-700 hover:bg-sky-600 px-3 py-1.5 rounded-lg text-xs font-bold">اجرای تست سلامت و ریاضی</button>
-      <div id="sys-badge" class="text-[11px] bg-slate-800 px-3 py-1.5 rounded-lg text-sky-300">در حال اتصال...</div>
-    </div>
+    <div><h1 class="text-xl font-bold text-emerald-400">ترمینال تحلیل فاز ۲ (ضد تناقض)</h1><p class="text-xs text-slate-400">واگرایی روی چارت | کندل تریدینگ‌ویو | پول هوشمند CMF/MFI/OBV | یکپارچگی ۴ بازه</p></div>
+    <div class="flex flex-wrap gap-2"><button onclick="runSelfTest()" class="bg-sky-700 px-3 py-1.5 rounded-lg text-xs font-bold">اجرای تست سلامت</button><div id="sys-badge" class="text-[11px] bg-slate-800 px-3 py-1.5 rounded-lg text-sky-300">در حال اتصال...</div></div>
   </header>
-
   <div id="test-box" class="hidden card p-4 border-sky-700/60 space-y-2 text-xs"></div>
-
   <div id="bourse-alert" class="hidden bg-amber-950/60 border border-amber-700/60 text-amber-100 text-xs p-3 rounded-xl space-y-2">
-    <div id="bourse-alert-text" class="leading-6"></div>
-    <div class="flex flex-wrap gap-2">
-      <input id="brs-key-input" type="text" placeholder="کلید brsapi.ir را اینجا بگذارید..." class="bg-slate-900 border border-amber-700 rounded-lg px-3 py-1.5 text-xs flex-1 min-w-[200px]" />
-      <button onclick="saveBrsKey()" class="bg-amber-600 px-4 py-1.5 rounded-lg font-bold text-xs">اتصال بورس</button>
-    </div>
+    <div id="bourse-alert-text"></div>
+    <div class="flex gap-2"><input id="brs-key-input" placeholder="کلید brsapi.ir..." class="bg-slate-900 border border-amber-700 rounded px-3 py-1.5 text-xs flex-1" /><button onclick="saveBrsKey()" class="bg-amber-600 px-4 py-1.5 rounded font-bold text-xs">اتصال بورس</button></div>
   </div>
 
-  <section class="card p-3 md:p-5 space-y-4">
+  <section class="card p-3 md:p-5 space-y-3">
     <div class="relative">
       <div class="flex flex-wrap gap-2">
-        <input id="search-box" type="text" oninput="liveSearch()" placeholder="نام فارسی یا انگلیسی نماد (بیت کوین، تتر، سولانا، BTC، فولاد...)" class="bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-sm flex-1 min-w-[210px]" value="BTC" />
-        <select id="mkt-select" class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm">
-          <option value="AUTO">همه بازارها</option>
-          <option value="CRYPTO">کریپتو</option>
-          <option value="BOURSE">بورس</option>
-        </select>
-        <button onclick="runAnalyze()" class="bg-emerald-600 hover:bg-emerald-500 px-5 py-2 rounded-lg text-sm font-bold">نمایش چارت</button>
+        <input id="search-box" oninput="liveSearch()" placeholder="نام فارسی یا انگلیسی نماد (بیت کوین، تتر، فولاد...)" class="bg-slate-900 border border-slate-700 rounded-lg px-4 py-2 text-sm flex-1 min-w-[200px]" value="BTC" />
+        <select id="mkt-select" class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm"><option value="AUTO">همه بازارها</option><option value="CRYPTO">کریپتو</option><option value="BOURSE">بورس</option></select>
+        <button onclick="runAnalyze()" class="bg-emerald-600 px-5 py-2 rounded-lg text-sm font-bold">تحلیل کامل</button>
       </div>
-      <div id="autocomplete-list" class="hidden absolute z-30 w-full bg-slate-900 border border-slate-700 rounded-lg mt-1 max-h-60 overflow-y-auto shadow-2xl"></div>
+      <div id="autocomplete-list" class="hidden absolute z-30 w-full bg-slate-900 border border-slate-700 rounded-lg mt-1 max-h-60 overflow-y-auto"></div>
     </div>
 
-    <div id="analysis-area" class="space-y-4 hidden">
-      <div id="speed-bar" class="text-xs bg-slate-900 border border-slate-800 px-3 py-2 rounded-lg flex flex-wrap justify-between gap-2"></div>
-
-      <!-- بنر الگوی خودکار + بک‌تست ۱۸۰ روزه -->
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-2.5 text-xs">
-        <div id="pattern-banner" class="bg-slate-900 border border-amber-700/50 p-3 rounded-xl leading-6"></div>
-        <div id="backtest-banner" class="bg-slate-900 border border-sky-700/50 p-3 rounded-xl leading-6"></div>
+    <div id="analysis-area" class="space-y-3 hidden">
+      <div id="speed-bar" class="text-xs bg-slate-900 border border-slate-800 px-3 py-2 rounded-lg flex flex-wrap justify-between"></div>
+      <!-- کارت یکپارچگی ضد تناقض -->
+      <div id="coherence-banner" class="bg-slate-900 border border-emerald-700/60 p-3 rounded-xl text-xs space-y-1"></div>
+      <!-- کارت واگرایی، کندل‌شناسی و پول هوشمند -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-2.5 text-xs">
+        <div id="div-card" class="bg-slate-900 border border-slate-800 p-3 rounded-xl leading-6"></div>
+        <div id="cs-card" class="bg-slate-900 border border-slate-800 p-3 rounded-xl leading-6"></div>
+        <div id="sm-card" class="bg-slate-900 border border-slate-800 p-3 rounded-xl leading-6"></div>
       </div>
 
-      <!-- نوار ابزار روشن/خاموش اندیکاتورها -->
-      <div class="bg-slate-900/90 border border-slate-800 p-2.5 rounded-xl flex flex-wrap items-center gap-2 text-xs">
-        <span class="text-slate-400 font-bold ml-1">اندیکاتورها:</span>
-        <button onclick="toggleInd('pattern')" id="btn-pattern" class="ind-btn ind-on px-3 py-1 rounded-lg">کانال/پرچم/مثلث خودکار</button>
-        <button onclick="toggleInd('pa')" id="btn-pa" class="ind-btn ind-on px-3 py-1 rounded-lg">پرایس اکشن</button>
-        <button onclick="toggleInd('fib')" id="btn-fib" class="ind-btn ind-off px-3 py-1 rounded-lg">فیبوناچی</button>
-        <button onclick="toggleInd('ema')" id="btn-ema" class="ind-btn ind-off px-3 py-1 rounded-lg">EMA 20/50</button>
-        <button onclick="toggleInd('bb')" id="btn-bb" class="ind-btn ind-off px-3 py-1 rounded-lg">بولینگر</button>
-        <button onclick="toggleInd('vol')" id="btn-vol" class="ind-btn ind-on px-3 py-1 rounded-lg">حجم</button>
-        <button onclick="toggleInd('rsi')" id="btn-rsi" class="ind-btn ind-on px-3 py-1 rounded-lg">RSI (14)</button>
-        <button onclick="toggleInd('macd')" id="btn-macd" class="ind-btn ind-on px-3 py-1 rounded-lg">MACD</button>
-        <span class="flex-1"></span>
-        <button onclick="setAllInd(true)" class="bg-sky-700 px-3 py-1 rounded-lg font-bold">همه روشن</button>
-        <button onclick="setAllInd(false)" class="bg-slate-700 px-3 py-1 rounded-lg">فقط کندل</button>
+      <div class="bg-slate-900/90 border border-slate-800 p-2 rounded-xl flex flex-wrap items-center gap-1.5 text-xs">
+        <button onclick="toggleInd('pattern')" id="btn-pattern" class="ind-btn ind-on px-2.5 py-1 rounded-lg">کانال/پرچم</button>
+        <button onclick="toggleInd('div')" id="btn-div" class="ind-btn ind-on px-2.5 py-1 rounded-lg">خط واگرایی</button>
+        <button onclick="toggleInd('pa')" id="btn-pa" class="ind-btn ind-on px-2.5 py-1 rounded-lg">پرایس اکشن</button>
+        <button onclick="toggleInd('fib')" id="btn-fib" class="ind-btn ind-off px-2.5 py-1 rounded-lg">فیبوناچی</button>
+        <button onclick="toggleInd('ema')" id="btn-ema" class="ind-btn ind-off px-2.5 py-1 rounded-lg">EMA 20/50</button>
+        <button onclick="toggleInd('bb')" id="btn-bb" class="ind-btn ind-off px-2.5 py-1 rounded-lg">بولینگر</button>
+        <button onclick="toggleInd('vol')" id="btn-vol" class="ind-btn ind-on px-2.5 py-1 rounded-lg">حجم</button>
+        <button onclick="toggleInd('rsi')" id="btn-rsi" class="ind-btn ind-on px-2.5 py-1 rounded-lg">RSI</button>
+        <button onclick="toggleInd('macd')" id="btn-macd" class="ind-btn ind-on px-2.5 py-1 rounded-lg">MACD</button>
+        <button onclick="setAllInd(true)" class="bg-sky-700 px-2.5 py-1 rounded-lg font-bold">همه</button>
+        <button onclick="setAllInd(false)" class="bg-slate-700 px-2.5 py-1 rounded-lg">پاک</button>
       </div>
 
-      <!-- کانتینر چارت اصلی -->
       <div class="bg-[#0b1220] border border-slate-800 rounded-xl p-2 space-y-1">
         <div id="ohlc-legend" class="text-[11px] font-mono text-slate-300 px-2 py-1 flex flex-wrap gap-3" dir="ltr"></div>
-        <div id="main-chart-box" class="w-full" style="height: 360px;"></div>
-        <div id="rsi-wrap" class="border-t border-slate-800/80 pt-1">
-          <div class="text-[10px] text-purple-300 px-2" id="rsi-label">RSI (14) Wilder</div>
-          <div id="rsi-chart-box" class="w-full" style="height: 120px;"></div>
-        </div>
-        <div id="macd-wrap" class="border-t border-slate-800/80 pt-1">
-          <div class="text-[10px] text-sky-300 px-2">MACD (12, 26, 9)</div>
-          <div id="macd-chart-box" class="w-full" style="height: 130px;"></div>
-        </div>
+        <div id="main-chart-box" class="w-full" style="height: 350px;"></div>
+        <div id="rsi-wrap" class="border-t border-slate-800 pt-1"><div class="text-[10px] text-purple-300 px-2" id="rsi-label">RSI (14)</div><div id="rsi-chart-box" style="height: 115px;"></div></div>
+        <div id="macd-wrap" class="border-t border-slate-800 pt-1"><div class="text-[10px] text-sky-300 px-2">MACD</div><div id="macd-chart-box" style="height: 120px;"></div></div>
       </div>
 
-      <!-- سوییچ نمای دوحالته ۴ بازه (روزانه راست / هفتگی چپ / ماهانه راست / ۱۲۰ روزه چپ) -->
-      <div class="flex flex-wrap justify-between items-center gap-2 pt-1">
-        <div class="text-sm font-bold text-sky-400" id="confluence-badge">تحلیل ۴ بازه زمانی</div>
-        <div class="flex gap-1.5 text-xs">
-          <button onclick="setHorizonView('compact')" id="hv-compact" class="bg-emerald-600 px-3 py-1 rounded-lg font-bold">نمای جمع‌وجور (۲×۲)</button>
-          <button onclick="setHorizonView('full')" id="hv-full" class="bg-slate-800 px-3 py-1 rounded-lg">نمای کامل تحلیلی</button>
-        </div>
-      </div>
+      <div class="flex justify-between items-center"><div class="text-sm font-bold text-sky-400" id="confluence-badge">۴ بازه زمانی</div><div class="flex gap-1.5 text-xs"><button onclick="setHorizonView('compact')" id="hv-compact" class="bg-emerald-600 px-3 py-1 rounded font-bold">نمای ۲×۲</button><button onclick="setHorizonView('full')" id="hv-full" class="bg-slate-800 px-3 py-1 rounded">کامل</button></div></div>
       <div id="horizons-grid"></div>
 
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
-        <div class="bg-slate-900 p-3 rounded-xl border border-emerald-900/50 space-y-1">
-          <b class="text-emerald-400">تحلیلگر بنیادی و نقدینگی</b>
-          <div id="fund-info" class="text-slate-300 leading-6"></div>
-        </div>
-        <div class="bg-slate-900 p-3 rounded-xl border border-purple-900/50 space-y-1">
-          <b class="text-purple-400">روانشناس بازار</b>
-          <div id="psych-info" class="text-slate-300 leading-6"></div>
-        </div>
-        <div class="bg-slate-900 p-3 rounded-xl border border-amber-900/50 space-y-1">
-          <b class="text-amber-400">استراتژی گذشته، حال و آینده</b>
-          <div id="strat-info" class="text-slate-300 leading-6 space-y-1"></div>
-        </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+        <div id="bt-banner" class="bg-slate-900 border border-sky-800/50 p-3 rounded-xl"></div>
+        <div id="strat-info" class="bg-slate-900 border border-amber-800/50 p-3 rounded-xl space-y-1"></div>
       </div>
     </div>
   </section>
 
-  <!-- اسکنر ۱۰ فرصت برتر در هر بازه + اجماع ۴/۴ -->
-  <section class="card p-4 space-y-3">
-    <div class="flex justify-between items-center">
-      <h2 class="text-base font-bold text-sky-400">۱۰ فرصت برتر هر بازه (روزانه، هفتگی، ماهانه، ۱۲۰ روزه) با اجماع ۴/۴</h2>
-      <button onclick="loadTop10()" class="text-xs bg-slate-800 px-3 py-1 rounded">بروزرسانی اسکن</button>
-    </div>
-    <div id="top10-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3"></div>
-  </section>
+  <section class="card p-4 space-y-3"><h2 class="text-base font-bold text-sky-400">۱۰ فرصت برتر در ۴ بازه (با اجماع واقعی)</h2><div id="top10-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3"></div></section>
 
-  <!-- پرتفوی شخصی -->
   <section class="card p-4 space-y-3">
-    <h2 class="text-base font-bold text-purple-400">پرتفوی شخصی (محاسبه با تتر زنده نوبیتکس)</h2>
-    <div class="grid grid-cols-1 sm:grid-cols-5 gap-2">
-      <input id="pf-sym" placeholder="نماد (BTC / تتر / فولاد)" class="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-xs" />
-      <select id="pf-mkt" class="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-xs"><option value="CRYPTO">کریپتو</option><option value="BOURSE">بورس</option></select>
-      <input id="pf-qty" type="number" step="any" placeholder="تعداد" class="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-xs" />
-      <input id="pf-price" type="number" step="any" placeholder="قیمت خرید (تومان)" class="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-xs" />
-      <button onclick="addPf()" class="bg-purple-600 rounded px-3 py-2 text-xs font-bold">افزودن</button>
-    </div>
+    <h2 class="text-base font-bold text-purple-400">پرتفوی شخصی</h2>
+    <div class="grid grid-cols-1 sm:grid-cols-5 gap-2"><input id="pf-sym" placeholder="نماد" class="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-xs" /><select id="pf-mkt" class="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-xs"><option value="CRYPTO">کریپتو</option><option value="BOURSE">بورس</option></select><input id="pf-qty" type="number" step="any" placeholder="تعداد" class="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-xs" /><input id="pf-price" type="number" step="any" placeholder="خرید (تومان)" class="bg-slate-900 border border-slate-700 rounded px-3 py-2 text-xs" /><button onclick="addPf()" class="bg-purple-600 rounded px-3 py-2 text-xs font-bold">افزودن</button></div>
     <div class="overflow-x-auto"><table class="w-full text-xs text-right"><thead class="text-slate-400 border-b border-slate-800"><tr><th class="py-2">نماد</th><th>بازار</th><th>تعداد</th><th>خرید</th><th>فعلی</th><th>سود/زیان</th><th>وضعیت</th><th>حذف</th></tr></thead><tbody id="pf-body"></tbody></table></div>
   </section>
 
-  <!-- تابلوی قیمت -->
   <section class="card p-4 space-y-3">
-    <h2 class="text-base font-bold text-emerald-400">تابلوی قیمت زنده و مقایسه</h2>
-    <div class="flex flex-wrap gap-2">
-      <button onclick="swTab('crypto')" class="tbtn bg-emerald-600 px-3 py-1 rounded text-xs font-bold" data-t="crypto">کریپتو</button>
-      <button onclick="swTab('bourse')" class="tbtn bg-slate-800 px-3 py-1 rounded text-xs" data-t="bourse">بورس</button>
-      <button onclick="swTab('metals')" class="tbtn bg-slate-800 px-3 py-1 rounded text-xs" data-t="metals">فلزات و طلا</button>
-      <button onclick="swTab('etfs')" class="tbtn bg-slate-800 px-3 py-1 rounded text-xs" data-t="etfs">صندوق‌ها</button>
-      <button onclick="swTab('forex')" class="tbtn bg-slate-800 px-3 py-1 rounded text-xs" data-t="forex">ارز کشورها</button>
-    </div>
+    <h2 class="text-base font-bold text-emerald-400">تابلوی قیمت</h2>
+    <div class="flex flex-wrap gap-2"><button onclick="swTab('crypto')" class="tbtn bg-emerald-600 px-3 py-1 rounded text-xs font-bold" data-t="crypto">کریپتو</button><button onclick="swTab('bourse')" class="tbtn bg-slate-800 px-3 py-1 rounded text-xs" data-t="bourse">بورس</button><button onclick="swTab('metals')" class="tbtn bg-slate-800 px-3 py-1 rounded text-xs" data-t="metals">طلا</button><button onclick="swTab('etfs')" class="tbtn bg-slate-800 px-3 py-1 rounded text-xs" data-t="etfs">صندوق</button><button onclick="swTab('forex')" class="tbtn bg-slate-800 px-3 py-1 rounded text-xs" data-t="forex">ارز</button></div>
     <div class="overflow-x-auto"><table class="w-full text-xs text-right"><thead class="text-slate-400 border-b border-slate-800"><tr><th class="py-2">#</th><th>نماد</th><th>دیروز</th><th>امروز</th><th>تغییر</th></tr></thead><tbody id="wl-body"></tbody></table></div>
   </section>
 
-  <footer class="text-center text-[11px] text-slate-500 pb-4">
-    نمودارها با <a href="https://www.tradingview.com" target="_blank" class="text-sky-400 underline">TradingView Lightweight Charts™</a>
-  </footer>
-
 <script>
-let wl = {}, curTab = 'crypto', searchTimer = null, lastPayload = null, horizonMode = 'compact';
-let mainChart = null, rsiChart = null, macdChart = null;
-const indState = { pattern: true, pa: true, fib: false, ema: false, bb: false, vol: true, rsi: true, macd: true };
-
-const fmt = n => (n === null || n === undefined) ? '-' : Number(n).toLocaleString('fa-IR', {maximumFractionDigits: 6});
+let wl={}, curTab='crypto', searchTimer=null, lastPayload=null, horizonMode='compact', mainChart=null, rsiChart=null, macdChart=null;
+const indState={pattern:true, div:true, pa:true, fib:false, ema:false, bb:false, vol:true, rsi:true, macd:true};
+const fmt = n => (n===null||n===undefined) ? '-' : Number(n).toLocaleString('fa-IR', {maximumFractionDigits: 6});
 const getBrs = () => localStorage.getItem('BRSAPI_KEY') || '';
+async function safeJson(u, o){ const r = await fetch(u, o); if(!r.ok) throw new Error(r.status); return await r.json(); }
+function saveBrsKey(){ localStorage.setItem('BRSAPI_KEY', document.getElementById('brs-key-input').value.trim()); loadSys(); loadWL(); loadTop10(); }
 
-async function safeJson(url, opts) {
-  const res = await fetch(url, opts);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return await res.json();
-}
-
-function saveBrsKey() { localStorage.setItem('BRSAPI_KEY', document.getElementById('brs-key-input').value.trim()); loadSys(); loadWL(); loadTop10(); }
-
-async function runSelfTest() {
-  const box = document.getElementById('test-box');
-  box.classList.remove('hidden');
-  box.innerHTML = '<div class="text-amber-300">در حال اجرای تست‌های ریاضی و الگوها...</div>';
-  try {
+async function runSelfTest(){
+  const b = document.getElementById('test-box'); b.classList.remove('hidden'); b.innerHTML = 'در حال تست...';
+  try{
     const d = await safeJson(`/api/self-test?brs_key=${encodeURIComponent(getBrs())}`);
-    box.innerHTML = `<div class="font-bold ${d.all_math_tests_passed ? 'text-emerald-400' : 'text-rose-400'}">نتیجه تست هسته ریاضی و الگوها: ${d.all_math_tests_passed ? 'ALL PASSED ✅' : 'FAILED ❌'}</div>` +
-      d.checks.map(c => `<div class="flex justify-between border-b border-slate-800 py-1"><span>${c.passed ? '✅' : '⚠️'} <b>${c.name}</b></span><span class="text-slate-400" dir="ltr">${c.detail}</span></div>`).join('');
-  } catch (e) { box.innerHTML = `<div class="text-rose-400">خطا: ${e.message}</div>`; }
+    b.innerHTML = `<div class="font-bold ${d.all_math_tests_passed?'text-emerald-400':'text-rose-400'}">نتیجه تست فاز ۲: ${d.all_math_tests_passed?'ALL PASSED ✅':'FAILED ❌'}</div>` + d.checks.map(c=>`<div class="flex justify-between border-b border-slate-800 py-1"><span>${c.passed?'✅':'⚠️'} <b>${c.name}</b></span><span class="text-slate-400" dir="ltr">${c.detail}</span></div>`).join('');
+  }catch(e){ b.innerHTML = e.message; }
 }
 
-function toggleInd(k) { indState[k] = !indState[k]; updateIndButtons(); if (lastPayload) renderTradingCharts(lastPayload.chart); }
-function setAllInd(on) { Object.keys(indState).forEach(k => indState[k] = on); updateIndButtons(); if (lastPayload) renderTradingCharts(lastPayload.chart); }
-function updateIndButtons() { Object.keys(indState).forEach(k => { const b = document.getElementById('btn-' + k); if (b) b.className = `ind-btn ${indState[k] ? 'ind-on' : 'ind-off'} px-3 py-1 rounded-lg`; }); }
+function toggleInd(k){ indState[k]=!indState[k]; updateIndButtons(); if(lastPayload) renderTradingCharts(lastPayload.chart); }
+function setAllInd(on){ Object.keys(indState).forEach(k=>indState[k]=on); updateIndButtons(); if(lastPayload) renderTradingCharts(lastPayload.chart); }
+function updateIndButtons(){ Object.keys(indState).forEach(k=>{ const b=document.getElementById('btn-'+k); if(b) b.className=`ind-btn ${indState[k]?'ind-on':'ind-off'} px-2.5 py-1 rounded-lg`; }); }
+function setHorizonView(m){ horizonMode=m; document.getElementById('hv-compact').className=m==='compact'?'bg-emerald-600 px-3 py-1 rounded font-bold':'bg-slate-800 px-3 py-1 rounded'; document.getElementById('hv-full').className=m==='full'?'bg-emerald-600 px-3 py-1 rounded font-bold':'bg-slate-800 px-3 py-1 rounded'; if(lastPayload) renderHorizons(lastPayload); }
 
-function setHorizonView(m) {
-  horizonMode = m;
-  document.getElementById('hv-compact').className = m === 'compact' ? 'bg-emerald-600 px-3 py-1 rounded-lg font-bold' : 'bg-slate-800 px-3 py-1 rounded-lg';
-  document.getElementById('hv-full').className = m === 'full' ? 'bg-emerald-600 px-3 py-1 rounded-lg font-bold' : 'bg-slate-800 px-3 py-1 rounded-lg';
-  if (lastPayload) renderHorizons(lastPayload);
-}
-
-function renderHorizons(d) {
-  const order = ['H1_DAILY', 'H2_WEEKLY', 'H3_MONTHLY', 'H4_120D'];
-  document.getElementById('confluence-badge').innerText = `تحلیل ۴ بازه زمانی (اجماع صعودی: ${d.confluence})`;
-  const grid = document.getElementById('horizons-grid');
-
-  if (horizonMode === 'compact') {
-    // نمای ۲×۲ جمع‌وجور: ردیف اول روزانه (راست) + هفتگی (چپ) | ردیف دوم ماهانه (راست) + ۱۲۰ روزه (چپ)
-    grid.className = 'grid grid-cols-2 gap-2.5';
-    grid.innerHTML = order.map(k => {
-      const h = d.contracts[k];
-      if (!h.evaluatable) return `<div class="bg-slate-900 border border-rose-900/40 p-2.5 rounded-xl text-xs"><div class="font-bold text-rose-400">⛔ ${h.label}</div><div class="text-[11px] text-rose-300 mt-1">داده کافی نیست (${h.available_bars}/${h.required_min_bars})</div></div>`;
-      return `<div class="bg-slate-900 border border-slate-800 p-2.5 rounded-xl text-xs space-y-1">
-        <div class="flex justify-between items-center"><b class="text-sky-400">${h.icon} ${h.label}</b><span class="text-[10px] text-slate-400">R/R ${h.rr}</span></div>
-        <div class="font-bold text-${h.tone}-400 truncate">${h.action}</div>
-        <div class="flex justify-between text-[11px]"><span class="text-emerald-400">+${h.net_return_pct}%</span><span class="text-rose-400">-${h.net_risk_pct}%</span></div>
-      </div>`;
-    }).join('');
+function renderHorizons(d){
+  const order=['H1_DAILY','H2_WEEKLY','H3_MONTHLY','H4_120D'];
+  document.getElementById('confluence-badge').innerText=`تحلیل ۴ بازه (اجماع: ${d.confluence})`;
+  const g=document.getElementById('horizons-grid');
+  if(horizonMode==='compact'){
+    g.className='grid grid-cols-2 gap-2.5';
+    g.innerHTML=order.map(k=>{const h=d.contracts[k]; if(!h.evaluatable) return `<div class="bg-slate-900 border border-rose-900/40 p-2.5 rounded-xl text-xs"><b class="text-rose-400">⛔ ${h.label}</b><div class="text-[11px] text-rose-300 mt-1">${h.available_bars}/${h.required_min_bars}</div></div>`;
+      return `<div class="bg-slate-900 border border-slate-800 p-2.5 rounded-xl text-xs space-y-1"><div class="flex justify-between"><b class="text-sky-400">${h.icon} ${h.label}</b><span class="text-[10px] text-slate-400">R/R ${h.rr}</span></div><div class="font-bold text-${h.tone}-400 truncate">${h.action}</div><div class="flex justify-between text-[11px]"><span class="text-emerald-400">+${h.net_return_pct}%</span><span class="text-rose-400">-${h.net_risk_pct}%</span></div></div>`;}).join('');
   } else {
-    grid.className = 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3';
-    grid.innerHTML = order.map(k => {
-      const h = d.contracts[k];
-      if (!h.evaluatable) return `<div class="bg-slate-900 border border-rose-900/50 p-3 rounded-xl text-xs"><b class="text-rose-400">⛔ ${h.label}</b><div class="mt-1 text-rose-300">قابل ارزیابی نیست (${h.available_bars}/${h.required_min_bars} کندل)</div></div>`;
-      return `<div class="bg-slate-900 border border-slate-800 p-3 rounded-xl text-xs space-y-1">
-        <div class="font-bold text-sky-400">${h.icon} ${h.label}</div>
-        <div class="text-${h.tone}-400 font-bold">${h.action}</div>
-        <div>هدف فروش: <b>${fmt(h.target)}</b> (<span class="text-emerald-400">+${h.net_return_pct}%</span>)</div>
-        <div>حد ضرر: <b>${fmt(h.stop)}</b> (<span class="text-rose-400">-${h.net_risk_pct}%</span>)</div>
-        <div class="text-slate-400">ریسک/ریوارد: ${h.rr} | کندل: ${h.available_bars}</div>
-      </div>`;
-    }).join('');
+    g.className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3';
+    g.innerHTML=order.map(k=>{const h=d.contracts[k]; if(!h.evaluatable) return `<div class="bg-slate-900 border border-rose-900/50 p-3 rounded-xl text-xs"><b class="text-rose-400">⛔ ${h.label}</b><div>قابل ارزیابی نیست</div></div>`;
+      return `<div class="bg-slate-900 border border-slate-800 p-3 rounded-xl text-xs space-y-1"><b class="text-sky-400">${h.icon} ${h.label}</b><div class="text-${h.tone}-400 font-bold">${h.action}</div><div>هدف: <b>${fmt(h.target)}</b> (+${h.net_return_pct}%)</div><div>حد ضرر: <b>${fmt(h.stop)}</b> (-${h.net_risk_pct}%)</div><div class="text-slate-400">R/R: ${h.rr}</div></div>`;}).join('');
   }
 }
 
-function chartBaseOpts(height, hideTime = false) {
-  return {
-    height, layout: { background: { type: 'solid', color: '#0b1220' }, textColor: '#94a3b8' },
-    grid: { vertLines: { color: '#1e293b' }, horzLines: { color: '#1e293b' } },
-    crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
-    rightPriceScale: { borderColor: '#334155' }, timeScale: { borderColor: '#334155', visible: !hideTime },
-  };
-}
+function chartOpts(h, hideT){ return {height:h, layout:{background:{type:'solid',color:'#0b1220'}, textColor:'#94a3b8'}, grid:{vertLines:{color:'#1e293b'}, horzLines:{color:'#1e293b'}}, crosshair:{mode:LightweightCharts.CrosshairMode.Normal}, rightPriceScale:{borderColor:'#334155'}, timeScale:{borderColor:'#334155', visible:!hideT}}; }
 
-function renderTradingCharts(ch) {
-  if (mainChart) { mainChart.remove(); mainChart = null; }
-  if (rsiChart) { rsiChart.remove(); rsiChart = null; }
-  if (macdChart) { macdChart.remove(); macdChart = null; }
+function renderTradingCharts(ch){
+  if(mainChart){mainChart.remove();mainChart=null;} if(rsiChart){rsiChart.remove();rsiChart=null;} if(macdChart){macdChart.remove();macdChart=null;}
+  const el=document.getElementById('main-chart-box');
+  mainChart=LightweightCharts.createChart(el,{...chartOpts(350, indState.rsi||indState.macd), width:el.clientWidth});
+  const cs=mainChart.addCandlestickSeries({upColor:'#10b981',downColor:'#ef4444',borderUpColor:'#10b981',borderDownColor:'#ef4444',wickUpColor:'#10b981',wickDownColor:'#ef4444'});
+  cs.setData(ch.candles);
+  const showO=c=>{if(!c)return; document.getElementById('ohlc-legend').innerHTML=`<span>O:<b>${c.open}</b></span><span>H:<b>${c.high}</b></span><span>L:<b>${c.low}</b></span><span class="${c.close>=c.open?'text-emerald-400':'text-rose-400'}">C:<b>${c.close}</b></span>`;};
+  showO(ch.candles[ch.candles.length-1]);
+  mainChart.subscribeCrosshairMove(p=>{if(p&&p.seriesData){const d=p.seriesData.get(cs); if(d) showO(d);}});
+  if(indState.vol){ const v=mainChart.addHistogramSeries({priceFormat:{type:'volume'},priceScaleId:'vol'}); mainChart.priceScale('vol').applyOptions({scaleMargins:{top:0.82,bottom:0}}); v.setData(ch.volume); }
+  if(indState.ema){ mainChart.addLineSeries({color:'#38bdf8',lineWidth:2}).setData(ch.ema20); mainChart.addLineSeries({color:'#f59e0b',lineWidth:2}).setData(ch.ema50); }
+  if(indState.bb){ mainChart.addLineSeries({color:'rgba(168,85,247,0.7)',lineWidth:1,lineStyle:2}).setData(ch.bb_upper); mainChart.addLineSeries({color:'rgba(168,85,247,0.7)',lineWidth:1,lineStyle:2}).setData(ch.bb_lower); }
+  if(indState.pa){ cs.setMarkers(ch.pa_markers); cs.createPriceLine({price:ch.pa_support,color:'#10b981',lineWidth:1.5,axisLabelVisible:true,title:'حمایت'}); cs.createPriceLine({price:ch.pa_resistance,color:'#ef4444',lineWidth:1.5,axisLabelVisible:true,title:'مقاومت'}); }
+  if(indState.fib){ Object.entries(ch.fib).forEach(([k,v])=>cs.createPriceLine({price:v,color:'#facc15',lineWidth:1,lineStyle:2,axisLabelVisible:true,title:`Fib ${k}`})); }
+  if(indState.pattern&&ch.patterns&&ch.patterns.available){ mainChart.addLineSeries({color:'#f59e0b',lineWidth:2,lastValueVisible:false,priceLineVisible:false}).setData(ch.patterns.upper_line); mainChart.addLineSeries({color:'#06b6d4',lineWidth:2,lastValueVisible:false,priceLineVisible:false}).setData(ch.patterns.lower_line); }
+  if(indState.div&&ch.divergences&&ch.divergences.found){ ch.divergences.items.forEach(dv=>mainChart.addLineSeries({color:dv.color,lineWidth:2.5,lastValueVisible:false,priceLineVisible:false}).setData(dv.price_line)); }
 
-  const mainEl = document.getElementById('main-chart-box');
-  mainChart = LightweightCharts.createChart(mainEl, { ...chartBaseOpts(360, indState.rsi || indState.macd), width: mainEl.clientWidth });
-  const candleS = mainChart.addCandlestickSeries({ upColor: '#10b981', downColor: '#ef4444', borderUpColor: '#10b981', borderDownColor: '#ef4444', wickUpColor: '#10b981', wickDownColor: '#ef4444' });
-  candleS.setData(ch.candles);
+  const rw=document.getElementById('rsi-wrap');
+  if(indState.rsi&&ch.rsi.length){
+    rw.classList.remove('hidden'); document.getElementById('rsi-label').innerText=`RSI (14): ${ch.rsi_now}`;
+    const re=document.getElementById('rsi-chart-box'); rsiChart=LightweightCharts.createChart(re,{...chartOpts(115,indState.macd),width:re.clientWidth});
+    const rs=rsiChart.addLineSeries({color:'#a78bfa',lineWidth:2}); rs.setData(ch.rsi);
+    rs.createPriceLine({price:70,color:'#ef4444',lineWidth:1,lineStyle:2}); rs.createPriceLine({price:30,color:'#10b981',lineWidth:1,lineStyle:2});
+    if(indState.div&&ch.divergences&&ch.divergences.found){ ch.divergences.items.forEach(dv=>rsiChart.addLineSeries({color:dv.color,lineWidth:2.5,lastValueVisible:false,priceLineVisible:false}).setData(dv.rsi_line)); }
+  } else rw.classList.add('hidden');
 
-  const showOHLC = c => {
-    if (!c) return;
-    const col = c.close >= c.open ? 'text-emerald-400' : 'text-rose-400';
-    document.getElementById('ohlc-legend').innerHTML = `<span>O: <b>${c.open}</b></span><span>H: <b>${c.high}</b></span><span>L: <b>${c.low}</b></span><span class="${col}">C: <b>${c.close}</b></span>`;
-  };
-  showOHLC(ch.candles[ch.candles.length - 1]);
-  mainChart.subscribeCrosshairMove(p => { if (p && p.seriesData) { const d = p.seriesData.get(candleS); if (d) showOHLC(d); } });
+  const mw=document.getElementById('macd-wrap');
+  if(indState.macd){
+    mw.classList.remove('hidden'); const me=document.getElementById('macd-chart-box'); macdChart=LightweightCharts.createChart(me,{...chartOpts(120,false),width:me.clientWidth});
+    macdChart.addHistogramSeries().setData(ch.macd_hist); macdChart.addLineSeries({color:'#38bdf8',lineWidth:2}).setData(ch.macd); macdChart.addLineSeries({color:'#fb923c',lineWidth:1.5}).setData(ch.macd_signal);
+  } else mw.classList.add('hidden');
 
-  if (indState.vol) {
-    const vS = mainChart.addHistogramSeries({ priceFormat: { type: 'volume' }, priceScaleId: 'vol' });
-    mainChart.priceScale('vol').applyOptions({ scaleMargins: { top: 0.82, bottom: 0 } });
-    vS.setData(ch.volume);
-  }
-  if (indState.ema) {
-    mainChart.addLineSeries({ color: '#38bdf8', lineWidth: 2 }).setData(ch.ema20);
-    mainChart.addLineSeries({ color: '#f59e0b', lineWidth: 2 }).setData(ch.ema50);
-  }
-  if (indState.bb) {
-    mainChart.addLineSeries({ color: 'rgba(168,85,247,0.7)', lineWidth: 1, lineStyle: 2 }).setData(ch.bb_upper);
-    mainChart.addLineSeries({ color: 'rgba(168,85,247,0.7)', lineWidth: 1, lineStyle: 2 }).setData(ch.bb_lower);
-  }
-  if (indState.pa) {
-    candleS.setMarkers(ch.pa_markers);
-    candleS.createPriceLine({ price: ch.pa_support, color: '#10b981', lineWidth: 1.5, lineStyle: 0, axisLabelVisible: true, title: 'حمایت PA' });
-    candleS.createPriceLine({ price: ch.pa_resistance, color: '#ef4444', lineWidth: 1.5, lineStyle: 0, axisLabelVisible: true, title: 'مقاومت PA' });
-  }
-  if (indState.fib) {
-    const fc = { '0.0 (سقف)': '#ef4444', '0.236': '#fb923c', '0.382': '#facc15', '0.500': '#38bdf8', '0.618 (طلایی)': '#10b981', '1.0 (کف)': '#94a3b8' };
-    Object.entries(ch.fib).forEach(([lbl, val]) => candleS.createPriceLine({ price: val, color: fc[lbl] || '#cbd5e1', lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: `Fib ${lbl}` }));
-  }
-  // رسم خطوط مورب کانال/پرچم/مثلث + خط ماشه شکست و هدف الگو
-  if (indState.pattern && ch.patterns && ch.patterns.available) {
-    const pt = ch.patterns;
-    const upS = mainChart.addLineSeries({ color: '#f59e0b', lineWidth: 2, lastValueVisible: false, priceLineVisible: false });
-    upS.setData(pt.upper_line);
-    const loS = mainChart.addLineSeries({ color: '#06b6d4', lineWidth: 2, lastValueVisible: false, priceLineVisible: false });
-    loS.setData(pt.lower_line);
-    candleS.createPriceLine({ price: pt.breakout_price, color: '#facc15', lineWidth: 1, lineStyle: 1, axisLabelVisible: true, title: 'ماشه شکست' });
-    candleS.createPriceLine({ price: pt.pattern_target, color: '#a855f7', lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: 'هدف الگو' });
-  }
-
-  const rsiWrap = document.getElementById('rsi-wrap');
-  if (indState.rsi && ch.rsi.length) {
-    rsiWrap.classList.remove('hidden');
-    document.getElementById('rsi-label').innerText = `RSI (14) Wilder — مقدار فعلی: ${ch.rsi_now}`;
-    const rEl = document.getElementById('rsi-chart-box');
-    rsiChart = LightweightCharts.createChart(rEl, { ...chartBaseOpts(120, indState.macd), width: rEl.clientWidth });
-    const rs = rsiChart.addLineSeries({ color: '#a78bfa', lineWidth: 2 });
-    rs.setData(ch.rsi);
-    rs.createPriceLine({ price: 70, color: '#ef4444', lineWidth: 1, lineStyle: 2 });
-    rs.createPriceLine({ price: 30, color: '#10b981', lineWidth: 1, lineStyle: 2 });
-  } else { rsiWrap.classList.add('hidden'); }
-
-  const macdWrap = document.getElementById('macd-wrap');
-  if (indState.macd) {
-    macdWrap.classList.remove('hidden');
-    const mEl = document.getElementById('macd-chart-box');
-    macdChart = LightweightCharts.createChart(mEl, { ...chartBaseOpts(130, false), width: mEl.clientWidth });
-    macdChart.addHistogramSeries().setData(ch.macd_hist);
-    macdChart.addLineSeries({ color: '#38bdf8', lineWidth: 2 }).setData(ch.macd);
-    macdChart.addLineSeries({ color: '#fb923c', lineWidth: 1.5 }).setData(ch.macd_signal);
-  } else { macdWrap.classList.add('hidden'); }
-
-  const charts = [mainChart, rsiChart, macdChart].filter(Boolean);
-  charts.forEach(c => c.timeScale().subscribeVisibleLogicalRangeChange(r => { if (r) charts.forEach(o => { if (o !== c) o.timeScale().setVisibleLogicalRange(r); }); }));
+  const csAll=[mainChart,rsiChart,macdChart].filter(Boolean);
+  csAll.forEach(c=>c.timeScale().subscribeVisibleLogicalRangeChange(r=>{if(r)csAll.forEach(o=>{if(o!==c)o.timeScale().setVisibleLogicalRange(r);});}));
   mainChart.timeScale().fitContent();
 }
 
-window.addEventListener('resize', () => { if (lastPayload) renderTradingCharts(lastPayload.chart); });
+async function loadSys(){ try{ const s=await safeJson(`/api/system-status?brs_key=${encodeURIComponent(getBrs())}`); document.getElementById('sys-badge').innerText=`کریپتو: ${s.crypto_count} | بورس: ${s.bourse_count} | تتر: ${s.usdt_toman?fmt(s.usdt_toman)+' ت':'-'}`; const ab=document.getElementById('bourse-alert'); if(s.bourse_count<50){ab.classList.remove('hidden'); document.getElementById('brs-key-input').value=getBrs(); document.getElementById('bourse-alert-text').innerText=`بورس (${s.bourse_source}) برای ۷۰۰+ نماد نیاز به کلید رایگان brsapi.ir دارد:`;}else ab.classList.add('hidden'); }catch(e){} }
 
-async function loadSys() {
-  try {
-    const s = await safeJson(`/api/system-status?brs_key=${encodeURIComponent(getBrs())}`);
-    document.getElementById('sys-badge').innerText = `کریپتو: ${s.crypto_count} | بورس: ${s.bourse_count} | تتر: ${s.usdt_toman ? fmt(s.usdt_toman)+' ت' : 'نامشخص'}`;
-    const ab = document.getElementById('bourse-alert');
-    if (s.bourse_count < 50) {
-      ab.classList.remove('hidden');
-      document.getElementById('brs-key-input').value = getBrs();
-      document.getElementById('bourse-alert-text').innerText = `بورس (${s.bourse_source}) برای ۷۰۰+ نماد نیاز به کلید رایگان brsapi.ir دارد:`;
-    } else { ab.classList.add('hidden'); }
-  } catch (e) {}
+async function liveSearch(){
+  clearTimeout(searchTimer); const q=document.getElementById('search-box').value.trim(), l=document.getElementById('autocomplete-list');
+  if(!q){l.classList.add('hidden');return;}
+  searchTimer=setTimeout(async()=>{ try{ const d=await safeJson(`/api/search?q=${encodeURIComponent(q)}&brs_key=${encodeURIComponent(getBrs())}`); l.innerHTML=''; if(!d.results.length){l.classList.add('hidden');return;} d.results.forEach(r=>{ const dv=document.createElement('div'); dv.className='px-3 py-2 hover:bg-slate-800 cursor-pointer flex justify-between text-xs border-b border-slate-800/50'; dv.innerHTML=`<span><b>${r.symbol}</b> <span class="text-slate-400">${r.name}</span></span><span class="text-emerald-400">${fmt(r.today)} ${r.unit}</span>`; dv.onclick=()=>pickSymbol(r.symbol,r.market); l.appendChild(dv); }); l.classList.remove('hidden'); }catch(e){} }, 100);
 }
+function pickSymbol(s,m){ document.getElementById('search-box').value=s; document.getElementById('mkt-select').value=m; document.getElementById('autocomplete-list').classList.add('hidden'); runAnalyze(); }
 
-async function liveSearch() {
-  clearTimeout(searchTimer);
-  const q = document.getElementById('search-box').value.trim();
-  const list = document.getElementById('autocomplete-list');
-  if (!q) { list.classList.add('hidden'); return; }
-  searchTimer = setTimeout(async () => {
-    try {
-      const d = await safeJson(`/api/search?q=${encodeURIComponent(q)}&brs_key=${encodeURIComponent(getBrs())}`);
-      list.innerHTML = '';
-      if (!d.results.length) { list.classList.add('hidden'); return; }
-      d.results.forEach(r => {
-        const div = document.createElement('div');
-        div.className = 'px-3 py-2 hover:bg-slate-800 cursor-pointer flex justify-between text-xs border-b border-slate-800/50';
-        div.innerHTML = `<span><b></b> <span class="text-slate-400"></span></span><span class="text-emerald-400">${fmt(r.today)} ${r.unit}</span>`;
-        div.querySelector('b').textContent = r.symbol;
-        div.querySelector('span.text-slate-400').textContent = r.name;
-        div.onclick = () => pickSymbol(r.symbol, r.market);
-        list.appendChild(div);
-      });
-      list.classList.remove('hidden');
-    } catch (e) { list.classList.add('hidden'); }
-  }, 100);
-}
-
-function pickSymbol(sym, mkt) {
-  document.getElementById('search-box').value = sym;
-  document.getElementById('mkt-select').value = mkt;
+async function runAnalyze(){
   document.getElementById('autocomplete-list').classList.add('hidden');
-  runAnalyze();
+  const sym=document.getElementById('search-box').value, mkt=document.getElementById('mkt-select').value, area=document.getElementById('analysis-area'); area.classList.remove('hidden');
+  try{
+    const d=await safeJson(`/api/analyze?symbol=${encodeURIComponent(sym)}&market=${mkt}&brs_key=${encodeURIComponent(getBrs())}`);
+    if(!d.found||d.no_candles){ document.getElementById('speed-bar').innerHTML=`<span class="text-rose-400">${d.found?d.candle_source:'نماد یافت نشد'}</span>`; return; }
+    lastPayload=d;
+    document.getElementById('speed-bar').innerHTML=`<span><b>${d.symbol} (${d.display_name})</b> | قیمت: <b>${fmt(d.price)} ${d.unit}</b> | ${d.bars_count} کندل</span><span class="text-emerald-400">${d.elapsed_ms}ms</span>`;
+    document.getElementById('coherence-banner').innerHTML=`<div class="font-bold text-sm text-emerald-300">🧭 ${d.coherence.verdict} (امتیاز: ${d.coherence.score})</div>` + d.coherence.conflicts.map(c=>`<div class="text-slate-300">• ${c}</div>`).join('');
+    document.getElementById('div-card').innerHTML=`<div class="font-bold text-amber-400">🔀 واگرایی (RSI):</div>` + (d.divergences.found ? d.divergences.items.map(x=>`<div class="font-bold">${x.title}</div><div class="text-slate-300">${x.desc}</div>`).join('') : `<div class="text-slate-400">${d.divergences.summary}</div>`);
+    document.getElementById('cs-card').innerHTML=`<div class="font-bold text-sky-400">🕯️ کندل‌شناسی (تریدینگ‌ویو): ${d.candlesticks.bias_fa}</div>` + d.candlesticks.patterns.map(p=>`<div><b>${p.name}</b>: <span class="text-slate-300">${p.desc}</span></div>`).join('');
+    document.getElementById('sm-card').innerHTML=`<div class="font-bold text-emerald-400">💰 پول هوشمند: ${d.smart_money.verdict}</div><div class="text-slate-300">${d.smart_money.detail}</div>`;
+    renderTradingCharts(d.chart); renderHorizons(d);
+    document.getElementById('bt-banner').innerHTML=d.backtest.sufficient?`<b class="text-sky-400">📊 ${d.backtest.summary}</b>`:`<span class="text-slate-400">${d.backtest.reason}</span>`;
+    document.getElementById('strat-info').innerHTML=`<div>🔹 ${d.strategies.past}</div><div class="text-emerald-300">🔸 ${d.strategies.present}</div><div class="text-sky-300">🔺 ${d.strategies.future}</div>`;
+  }catch(e){ document.getElementById('speed-bar').innerHTML=e.message; }
 }
 
-async function runAnalyze() {
-  document.getElementById('autocomplete-list').classList.add('hidden');
-  const sym = document.getElementById('search-box').value;
-  const mkt = document.getElementById('mkt-select').value;
-  const area = document.getElementById('analysis-area');
-  area.classList.remove('hidden');
-  try {
-    const d = await safeJson(`/api/analyze?symbol=${encodeURIComponent(sym)}&market=${mkt}&brs_key=${encodeURIComponent(getBrs())}`);
-    if (!d.found || d.no_candles) {
-      document.getElementById('speed-bar').innerHTML = `<span class="text-rose-400">${d.found ? d.candle_source : 'نماد یافت نشد'}</span>`;
-      return;
-    }
-    lastPayload = d;
-    document.getElementById('speed-bar').innerHTML = `<span>نماد: <b>${d.symbol} (${d.display_name})</b> | قیمت: <b>${fmt(d.price)} ${d.unit}</b> | ${d.bars_count} کندل</span><span class="text-emerald-400">${d.elapsed_ms}ms</span>`;
+async function loadTop10(){ try{ const d=await safeJson(`/api/top10-scanner?brs_key=${encodeURIComponent(getBrs())}`); const nm={H1_DAILY:'۱) روزانه',H2_WEEKLY:'۲) هفتگی',H3_MONTHLY:'۳) ماهانه',H4_120D:'۴) ۱۲۰ روزه'}; document.getElementById('top10-grid').innerHTML=Object.keys(nm).map(k=>`<div class="bg-slate-900 border border-slate-800 rounded-xl p-3 space-y-1 text-xs"><div class="font-bold text-sky-400 border-b border-slate-800 pb-1">۱۰ برتر ${nm[k]}</div>${(d[k]||[]).map((x,i)=>`<div onclick="pickSymbol('${x.symbol}','${x.market}')" class="flex justify-between cursor-pointer hover:bg-slate-800 px-1 rounded"><span>${i+1}. <b>${x.symbol}</b> <span class="text-[10px] ${x.conf_num>=3?'text-amber-400':'text-slate-400'}">${x.conf_num>=3?'🔥':''}${x.confluence}</span></span><span class="text-emerald-400">+${x.net_return_pct}%</span></div>`).join('')||'<div class="text-slate-500">موردی یافت نشد</div>'}</div>`).join(''); }catch(e){} }
+async function loadWL(){ try{ wl=await safeJson(`/api/watchlists?brs_key=${encodeURIComponent(getBrs())}`); swTab(curTab); }catch(e){} }
+function swTab(t){ curTab=t; document.querySelectorAll('.tbtn').forEach(b=>b.className=b.dataset.t===t?'tbtn bg-emerald-600 px-3 py-1 rounded text-xs font-bold':'tbtn bg-slate-800 px-3 py-1 rounded text-xs'); const r=wl[t]||[]; document.getElementById('wl-body').innerHTML=r.length?r.map((it,i)=>`<tr class="border-b border-slate-800/60"><td class="py-1.5 text-slate-500">${i+1}</td><td class="font-bold">${it.symbol} <span class="text-slate-400 font-normal">${it.name}</span></td><td>${fmt(it.yesterday)}</td><td class="font-bold">${fmt(it.today)} ${it.unit}</td><td class="${(it.change_pct||0)>=0?'text-emerald-400':'text-rose-400'} font-bold" dir="ltr">${it.change_pct!==null?it.change_pct+'%':'-'}</td></tr>`).join(''):'<tr><td colspan="5" class="py-3 text-center text-amber-400">متصل نیست</td></tr>'; }
+async function loadPf(){ try{ const r=await safeJson(`/api/portfolio?brs_key=${encodeURIComponent(getBrs())}`); document.getElementById('pf-body').innerHTML=r.map(x=>`<tr class="border-b border-slate-800/60"><td class="py-1.5 font-bold">${x.symbol}</td><td>${x.market}</td><td>${fmt(x.quantity)}</td><td>${fmt(x.buy_price)}</td><td>${fmt(x.current_price)}</td><td class="${(x.pnl_pct||0)>=0?'text-emerald-400':'text-rose-400'} font-bold" dir="ltr">${x.pnl_pct!==null?x.pnl_pct+'%':'-'}</td><td>${x.signal}</td><td><button onclick="delPf(${x.id})" class="text-rose-400">حذف</button></td></tr>`).join(''); }catch(e){} }
+async function addPf(){ await safeJson('/api/portfolio',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({symbol:document.getElementById('pf-sym').value,market:document.getElementById('pf-mkt').value,quantity:parseFloat(document.getElementById('pf-qty').value||0),avg_buy_price_toman:parseFloat(document.getElementById('pf-price').value||0)})}); loadPf(); }
+async function delPf(id){ await safeJson(`/api/portfolio/${id}`,{method:'DELETE'}); loadPf(); }
 
-    const pt = d.chart.patterns;
-    document.getElementById('pattern-banner').innerHTML = pt && pt.available
-      ? `<div class="font-bold text-amber-400">📐 الگوی خودکار: ${pt.pattern_name}</div><div class="text-slate-300">${pt.description}</div><div class="text-[11px] text-purple-300">ماشه شکست: <b>${fmt(pt.breakout_price)}</b> | هدف الگو: <b>${fmt(pt.pattern_target)}</b></div>`
-      : `<div class="text-slate-400">الگوی کانال در دسترس نیست.</div>`;
-
-    const bt = d.backtest;
-    document.getElementById('backtest-banner').innerHTML = bt && bt.sufficient
-      ? `<div class="font-bold text-sky-400">📊 بک‌تست واقعی ۱۸۰ روزه همین نماد</div><div class="${bt.win_rate_pct >= 50 ? 'text-emerald-300' : 'text-rose-300'} font-bold">${bt.summary}</div>`
-      : `<div class="font-bold text-sky-400">📊 بک‌تست ۱۸۰ روزه</div><div class="text-slate-400">${bt ? bt.reason : 'نامشخص'}</div>`;
-
-    renderTradingCharts(d.chart);
-    renderHorizons(d);
-
-    document.getElementById('fund-info').innerText = d.fundamental;
-    document.getElementById('psych-info').innerText = `${d.psychology.mood} — ${d.psychology.advice}`;
-    document.getElementById('strat-info').innerHTML = `<div>🔹 ${d.strategies.past}</div><div class="text-emerald-300">🔸 ${d.strategies.present}</div><div class="text-sky-300">🔺 ${d.strategies.future}</div>`;
-  } catch (e) { document.getElementById('speed-bar').innerHTML = `<span class="text-rose-400">خطا: ${e.message}</span>`; }
-}
-
-async function loadTop10() {
-  const grid = document.getElementById('top10-grid');
-  grid.innerHTML = '<div class="text-xs text-amber-300 col-span-full">در حال اسکن ۱۰ برتر ۴ بازه...</div>';
-  try {
-    const d = await safeJson(`/api/top10-scanner?brs_key=${encodeURIComponent(getBrs())}`);
-    const names = {H1_DAILY:'۱) روزانه', H2_WEEKLY:'۲) هفتگی', H3_MONTHLY:'۳) ماهانه', H4_120D:'۴) ۱۲۰ روزه'};
-    grid.innerHTML = Object.keys(names).map(k => `
-      <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 space-y-1.5 text-xs">
-        <div class="font-bold text-sky-400 border-b border-slate-800 pb-1">۱۰ برتر ${names[k]}</div>
-        ${(d[k]||[]).map((x,i) => `
-          <div onclick="pickSymbol('${x.symbol}','${x.market}')" class="flex justify-between items-center cursor-pointer hover:bg-slate-800/70 px-1 py-0.5 rounded">
-            <span>${i+1}. <b>${x.symbol}</b> <span class="text-[10px] ${x.conf_num >= 3 ? 'text-amber-400' : 'text-slate-400'}">${x.conf_num>=3?'🔥':''}${x.confluence}</span></span>
-            <span class="text-emerald-400 font-bold">+${x.net_return_pct}%</span>
-          </div>`).join('') || '<div class="text-slate-500">مورد تاییدیافت نشد</div>'}
-      </div>`).join('');
-  } catch (e) { grid.innerHTML = `<div class="text-rose-400 text-xs">${e.message}</div>`; }
-}
-
-async function loadWL() { try { wl = await safeJson(`/api/watchlists?brs_key=${encodeURIComponent(getBrs())}`); swTab(curTab); } catch (e) {} }
-function swTab(t) {
-  curTab = t;
-  document.querySelectorAll('.tbtn').forEach(b => b.className = b.dataset.t === t ? 'tbtn bg-emerald-600 px-3 py-1 rounded text-xs font-bold' : 'tbtn bg-slate-800 px-3 py-1 rounded text-xs');
-  const rows = wl[t] || [];
-  document.getElementById('wl-body').innerHTML = rows.length ? rows.map((it,i) => `<tr class="border-b border-slate-800/60"><td class="py-1.5 text-slate-500">${i+1}</td><td class="font-bold">${it.symbol} <span class="text-slate-400 font-normal">${it.name}</span></td><td class="text-slate-400">${fmt(it.yesterday)}</td><td class="font-bold">${fmt(it.today)} ${it.unit}</td><td class="${(it.change_pct||0)>=0?'text-emerald-400':'text-rose-400'} font-bold" dir="ltr">${it.change_pct !== null ? it.change_pct + '%' : '-'}</td></tr>`).join('') : '<tr><td colspan="5" class="py-3 text-center text-amber-400">دیتای زنده این بخش در حال حاضر متصل نیست.</td></tr>';
-}
-
-async function loadPf() {
-  try {
-    const rows = await safeJson(`/api/portfolio?brs_key=${encodeURIComponent(getBrs())}`);
-    document.getElementById('pf-body').innerHTML = rows.map(r => `<tr class="border-b border-slate-800/60"><td class="py-1.5 font-bold">${r.symbol}</td><td>${r.market}</td><td>${fmt(r.quantity)}</td><td>${fmt(r.buy_price)}</td><td>${fmt(r.current_price)}</td><td class="${(r.pnl_pct||0)>=0?'text-emerald-400':'text-rose-400'} font-bold" dir="ltr">${r.pnl_pct !== null ? r.pnl_pct + '%' : '-'}</td><td>${r.signal}</td><td><button onclick="delPf(${r.id})" class="text-rose-400">حذف</button></td></tr>`).join('');
-  } catch (e) {}
-}
-async function addPf() {
-  await safeJson('/api/portfolio', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({symbol:document.getElementById('pf-sym').value, market:document.getElementById('pf-mkt').value, quantity:parseFloat(document.getElementById('pf-qty').value||0), avg_buy_price_toman:parseFloat(document.getElementById('pf-price').value||0)})});
-  loadPf();
-}
-async function delPf(id) { await safeJson(`/api/portfolio/${id}`, {method:'DELETE'}); loadPf(); }
-
+window.addEventListener('resize', ()=>{ if(lastPayload) renderTradingCharts(lastPayload.chart); });
 loadSys(); runAnalyze(); loadTop10(); loadWL(); loadPf();
 </script>
 </body>
