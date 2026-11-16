@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>فاز ۲ | واگرایی، کندل‌شناسی، پول هوشمند و یکپارچگی</title>
+  <title>فاز ۳ | هارمونیک، کنج، هیت‌مپ و یکپارچگی</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lightweight-charts@4.2.1/dist/lightweight-charts.standalone.production.js"></script>
   <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet" />
@@ -11,7 +11,7 @@
 </head>
 <body class="p-3 md:p-6 max-w-7xl mx-auto space-y-4">
   <header class="card p-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
-    <div><h1 class="text-xl font-bold text-emerald-400">ترمینال تحلیل فاز ۲ (ضد تناقض)</h1><p class="text-xs text-slate-400">واگرایی روی چارت | کندل تریدینگ‌ویو | پول هوشمند CMF/MFI/OBV | یکپارچگی ۴ بازه</p></div>
+    <div><h1 class="text-xl font-bold text-emerald-400">ترمینال تحلیل فاز ۳</h1><p class="text-xs text-slate-400">هارمونیک XABCD | کنج و کانال | اندیکاتور و نقشه هیت‌مپ | واگرایی و پول هوشمند</p></div>
     <div class="flex flex-wrap gap-2"><button onclick="runSelfTest()" class="bg-sky-700 px-3 py-1.5 rounded-lg text-xs font-bold">اجرای تست سلامت</button><div id="sys-badge" class="text-[11px] bg-slate-800 px-3 py-1.5 rounded-lg text-sky-300">در حال اتصال...</div></div>
   </header>
   <div id="test-box" class="hidden card p-4 border-sky-700/60 space-y-2 text-xs"></div>
@@ -32,18 +32,20 @@
 
     <div id="analysis-area" class="space-y-3 hidden">
       <div id="speed-bar" class="text-xs bg-slate-900 border border-slate-800 px-3 py-2 rounded-lg flex flex-wrap justify-between"></div>
-      <!-- کارت یکپارچگی ضد تناقض -->
       <div id="coherence-banner" class="bg-slate-900 border border-emerald-700/60 p-3 rounded-xl text-xs space-y-1"></div>
-      <!-- کارت واگرایی، کندل‌شناسی و پول هوشمند -->
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-2.5 text-xs">
+
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-2.5 text-xs">
+        <div id="harm-card" class="bg-slate-900 border border-slate-800 p-3 rounded-xl leading-6"></div>
         <div id="div-card" class="bg-slate-900 border border-slate-800 p-3 rounded-xl leading-6"></div>
         <div id="cs-card" class="bg-slate-900 border border-slate-800 p-3 rounded-xl leading-6"></div>
         <div id="sm-card" class="bg-slate-900 border border-slate-800 p-3 rounded-xl leading-6"></div>
       </div>
 
       <div class="bg-slate-900/90 border border-slate-800 p-2 rounded-xl flex flex-wrap items-center gap-1.5 text-xs">
-        <button onclick="toggleInd('pattern')" id="btn-pattern" class="ind-btn ind-on px-2.5 py-1 rounded-lg">کانال/پرچم</button>
+        <button onclick="toggleInd('harm')" id="btn-harm" class="ind-btn ind-on px-2.5 py-1 rounded-lg">هارمونیک XABCD</button>
+        <button onclick="toggleInd('pattern')" id="btn-pattern" class="ind-btn ind-on px-2.5 py-1 rounded-lg">کانال/کنج/پرچم</button>
         <button onclick="toggleInd('div')" id="btn-div" class="ind-btn ind-on px-2.5 py-1 rounded-lg">خط واگرایی</button>
+        <button onclick="toggleInd('heat')" id="btn-heat" class="ind-btn ind-on px-2.5 py-1 rounded-lg">نوار هیت‌مپ</button>
         <button onclick="toggleInd('pa')" id="btn-pa" class="ind-btn ind-on px-2.5 py-1 rounded-lg">پرایس اکشن</button>
         <button onclick="toggleInd('fib')" id="btn-fib" class="ind-btn ind-off px-2.5 py-1 rounded-lg">فیبوناچی</button>
         <button onclick="toggleInd('ema')" id="btn-ema" class="ind-btn ind-off px-2.5 py-1 rounded-lg">EMA 20/50</button>
@@ -58,21 +60,24 @@
       <div class="bg-[#0b1220] border border-slate-800 rounded-xl p-2 space-y-1">
         <div id="ohlc-legend" class="text-[11px] font-mono text-slate-300 px-2 py-1 flex flex-wrap gap-3" dir="ltr"></div>
         <div id="main-chart-box" class="w-full" style="height: 350px;"></div>
-        <div id="rsi-wrap" class="border-t border-slate-800 pt-1"><div class="text-[10px] text-purple-300 px-2" id="rsi-label">RSI (14)</div><div id="rsi-chart-box" style="height: 115px;"></div></div>
-        <div id="macd-wrap" class="border-t border-slate-800 pt-1"><div class="text-[10px] text-sky-300 px-2">MACD</div><div id="macd-chart-box" style="height: 120px;"></div></div>
+        <div id="heat-wrap" class="border-t border-slate-800 pt-1"><div class="text-[10px] text-amber-300 px-2">هیت‌مپ قدرت روند کندل‌ها (سبز=صعودی | قرمز=نزولی)</div><div id="heat-chart-box" style="height: 68px;"></div></div>
+        <div id="rsi-wrap" class="border-t border-slate-800 pt-1"><div class="text-[10px] text-purple-300 px-2" id="rsi-label">RSI (14)</div><div id="rsi-chart-box" style="height: 110px;"></div></div>
+        <div id="macd-wrap" class="border-t border-slate-800 pt-1"><div class="text-[10px] text-sky-300 px-2">MACD</div><div id="macd-chart-box" style="height: 110px;"></div></div>
       </div>
 
       <div class="flex justify-between items-center"><div class="text-sm font-bold text-sky-400" id="confluence-badge">۴ بازه زمانی</div><div class="flex gap-1.5 text-xs"><button onclick="setHorizonView('compact')" id="hv-compact" class="bg-emerald-600 px-3 py-1 rounded font-bold">نمای ۲×۲</button><button onclick="setHorizonView('full')" id="hv-full" class="bg-slate-800 px-3 py-1 rounded">کامل</button></div></div>
       <div id="horizons-grid"></div>
-
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-        <div id="bt-banner" class="bg-slate-900 border border-sky-800/50 p-3 rounded-xl"></div>
-        <div id="strat-info" class="bg-slate-900 border border-amber-800/50 p-3 rounded-xl space-y-1"></div>
-      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs"><div id="bt-banner" class="bg-slate-900 border border-sky-800/50 p-3 rounded-xl"></div><div id="strat-info" class="bg-slate-900 border border-amber-800/50 p-3 rounded-xl space-y-1"></div></div>
     </div>
   </section>
 
-  <section class="card p-4 space-y-3"><h2 class="text-base font-bold text-sky-400">۱۰ فرصت برتر در ۴ بازه (با اجماع واقعی)</h2><div id="top10-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3"></div></section>
+  <!-- نقشه حرارتی (Heatmap) کل بازار -->
+  <section class="card p-4 space-y-3">
+    <div class="flex justify-between items-center"><h2 class="text-base font-bold text-amber-400">هیت‌مپ لحظه‌ای کل بازار (برای تحلیل هر خانه رویش بزنید)</h2><button onclick="loadHeatmap()" class="text-xs bg-slate-800 px-3 py-1 rounded">بروزرسانی</button></div>
+    <div id="market-heatmap" class="grid grid-cols-3 sm:grid-cols-6 md:grid-cols-8 gap-1.5 text-center text-xs"></div>
+  </section>
+
+  <section class="card p-4 space-y-3"><h2 class="text-base font-bold text-sky-400">۱۰ فرصت برتر در ۴ بازه</h2><div id="top10-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3"></div></section>
 
   <section class="card p-4 space-y-3">
     <h2 class="text-base font-bold text-purple-400">پرتفوی شخصی</h2>
@@ -87,19 +92,19 @@
   </section>
 
 <script>
-let wl={}, curTab='crypto', searchTimer=null, lastPayload=null, horizonMode='compact', mainChart=null, rsiChart=null, macdChart=null;
-const indState={pattern:true, div:true, pa:true, fib:false, ema:false, bb:false, vol:true, rsi:true, macd:true};
+let wl={}, curTab='crypto', searchTimer=null, lastPayload=null, horizonMode='compact', mainChart=null, heatChart=null, rsiChart=null, macdChart=null;
+const indState={harm:true, pattern:true, div:true, heat:true, pa:true, fib:false, ema:false, bb:false, vol:true, rsi:true, macd:true};
 const fmt = n => (n===null||n===undefined) ? '-' : Number(n).toLocaleString('fa-IR', {maximumFractionDigits: 6});
 const getBrs = () => localStorage.getItem('BRSAPI_KEY') || '';
 async function safeJson(u, o){ const r = await fetch(u, o); if(!r.ok) throw new Error(r.status); return await r.json(); }
-function saveBrsKey(){ localStorage.setItem('BRSAPI_KEY', document.getElementById('brs-key-input').value.trim()); loadSys(); loadWL(); loadTop10(); }
+function saveBrsKey(){ localStorage.setItem('BRSAPI_KEY', document.getElementById('brs-key-input').value.trim()); loadSys(); loadWL(); loadTop10(); loadHeatmap(); }
 
 async function runSelfTest(){
-  const b = document.getElementById('test-box'); b.classList.remove('hidden'); b.innerHTML = 'در حال تست...';
+  const b=document.getElementById('test-box'); b.classList.remove('hidden'); b.innerHTML='در حال تست...';
   try{
-    const d = await safeJson(`/api/self-test?brs_key=${encodeURIComponent(getBrs())}`);
-    b.innerHTML = `<div class="font-bold ${d.all_math_tests_passed?'text-emerald-400':'text-rose-400'}">نتیجه تست فاز ۲: ${d.all_math_tests_passed?'ALL PASSED ✅':'FAILED ❌'}</div>` + d.checks.map(c=>`<div class="flex justify-between border-b border-slate-800 py-1"><span>${c.passed?'✅':'⚠️'} <b>${c.name}</b></span><span class="text-slate-400" dir="ltr">${c.detail}</span></div>`).join('');
-  }catch(e){ b.innerHTML = e.message; }
+    const d=await safeJson(`/api/self-test?brs_key=${encodeURIComponent(getBrs())}`);
+    b.innerHTML=`<div class="font-bold ${d.all_math_tests_passed?'text-emerald-400':'text-rose-400'}">نتیجه تست فاز ۳: ${d.all_math_tests_passed?'ALL PASSED ✅':'FAILED ❌'}</div>`+d.checks.map(c=>`<div class="flex justify-between border-b border-slate-800 py-1"><span>${c.passed?'✅':'⚠️'} <b>${c.name}</b></span><span class="text-slate-400" dir="ltr">${c.detail}</span></div>`).join('');
+  }catch(e){ b.innerHTML=e.message; }
 }
 
 function toggleInd(k){ indState[k]=!indState[k]; updateIndButtons(); if(lastPayload) renderTradingCharts(lastPayload.chart); }
@@ -125,9 +130,9 @@ function renderHorizons(d){
 function chartOpts(h, hideT){ return {height:h, layout:{background:{type:'solid',color:'#0b1220'}, textColor:'#94a3b8'}, grid:{vertLines:{color:'#1e293b'}, horzLines:{color:'#1e293b'}}, crosshair:{mode:LightweightCharts.CrosshairMode.Normal}, rightPriceScale:{borderColor:'#334155'}, timeScale:{borderColor:'#334155', visible:!hideT}}; }
 
 function renderTradingCharts(ch){
-  if(mainChart){mainChart.remove();mainChart=null;} if(rsiChart){rsiChart.remove();rsiChart=null;} if(macdChart){macdChart.remove();macdChart=null;}
+  if(mainChart){mainChart.remove();mainChart=null;} if(heatChart){heatChart.remove();heatChart=null;} if(rsiChart){rsiChart.remove();rsiChart=null;} if(macdChart){macdChart.remove();macdChart=null;}
   const el=document.getElementById('main-chart-box');
-  mainChart=LightweightCharts.createChart(el,{...chartOpts(350, indState.rsi||indState.macd), width:el.clientWidth});
+  mainChart=LightweightCharts.createChart(el,{...chartOpts(350, indState.heat||indState.rsi||indState.macd), width:el.clientWidth});
   const cs=mainChart.addCandlestickSeries({upColor:'#10b981',downColor:'#ef4444',borderUpColor:'#10b981',borderDownColor:'#ef4444',wickUpColor:'#10b981',wickDownColor:'#ef4444'});
   cs.setData(ch.candles);
   const showO=c=>{if(!c)return; document.getElementById('ohlc-legend').innerHTML=`<span>O:<b>${c.open}</b></span><span>H:<b>${c.high}</b></span><span>L:<b>${c.low}</b></span><span class="${c.close>=c.open?'text-emerald-400':'text-rose-400'}">C:<b>${c.close}</b></span>`;};
@@ -139,12 +144,20 @@ function renderTradingCharts(ch){
   if(indState.pa){ cs.setMarkers(ch.pa_markers); cs.createPriceLine({price:ch.pa_support,color:'#10b981',lineWidth:1.5,axisLabelVisible:true,title:'حمایت'}); cs.createPriceLine({price:ch.pa_resistance,color:'#ef4444',lineWidth:1.5,axisLabelVisible:true,title:'مقاومت'}); }
   if(indState.fib){ Object.entries(ch.fib).forEach(([k,v])=>cs.createPriceLine({price:v,color:'#facc15',lineWidth:1,lineStyle:2,axisLabelVisible:true,title:`Fib ${k}`})); }
   if(indState.pattern&&ch.patterns&&ch.patterns.available){ mainChart.addLineSeries({color:'#f59e0b',lineWidth:2,lastValueVisible:false,priceLineVisible:false}).setData(ch.patterns.upper_line); mainChart.addLineSeries({color:'#06b6d4',lineWidth:2,lastValueVisible:false,priceLineVisible:false}).setData(ch.patterns.lower_line); }
+  if(indState.harm&&ch.harmonics&&ch.harmonics.available){ mainChart.addLineSeries({color:'#e879f9',lineWidth:2.5,lastValueVisible:false,priceLineVisible:false}).setData(ch.harmonics.points); cs.createPriceLine({price:ch.harmonics.prz,color:'#e879f9',lineWidth:1.5,lineStyle:2,axisLabelVisible:true,title:'PRZ هارمونیک'}); }
   if(indState.div&&ch.divergences&&ch.divergences.found){ ch.divergences.items.forEach(dv=>mainChart.addLineSeries({color:dv.color,lineWidth:2.5,lastValueVisible:false,priceLineVisible:false}).setData(dv.price_line)); }
+
+  const hw=document.getElementById('heat-wrap');
+  if(indState.heat&&ch.heatmap){
+    hw.classList.remove('hidden'); const he=document.getElementById('heat-chart-box');
+    heatChart=LightweightCharts.createChart(he,{...chartOpts(68, indState.rsi||indState.macd), width:he.clientWidth});
+    heatChart.addHistogramSeries().setData(ch.heatmap);
+  } else hw.classList.add('hidden');
 
   const rw=document.getElementById('rsi-wrap');
   if(indState.rsi&&ch.rsi.length){
     rw.classList.remove('hidden'); document.getElementById('rsi-label').innerText=`RSI (14): ${ch.rsi_now}`;
-    const re=document.getElementById('rsi-chart-box'); rsiChart=LightweightCharts.createChart(re,{...chartOpts(115,indState.macd),width:re.clientWidth});
+    const re=document.getElementById('rsi-chart-box'); rsiChart=LightweightCharts.createChart(re,{...chartOpts(110,indState.macd),width:re.clientWidth});
     const rs=rsiChart.addLineSeries({color:'#a78bfa',lineWidth:2}); rs.setData(ch.rsi);
     rs.createPriceLine({price:70,color:'#ef4444',lineWidth:1,lineStyle:2}); rs.createPriceLine({price:30,color:'#10b981',lineWidth:1,lineStyle:2});
     if(indState.div&&ch.divergences&&ch.divergences.found){ ch.divergences.items.forEach(dv=>rsiChart.addLineSeries({color:dv.color,lineWidth:2.5,lastValueVisible:false,priceLineVisible:false}).setData(dv.rsi_line)); }
@@ -152,11 +165,11 @@ function renderTradingCharts(ch){
 
   const mw=document.getElementById('macd-wrap');
   if(indState.macd){
-    mw.classList.remove('hidden'); const me=document.getElementById('macd-chart-box'); macdChart=LightweightCharts.createChart(me,{...chartOpts(120,false),width:me.clientWidth});
+    mw.classList.remove('hidden'); const me=document.getElementById('macd-chart-box'); macdChart=LightweightCharts.createChart(me,{...chartOpts(110,false),width:me.clientWidth});
     macdChart.addHistogramSeries().setData(ch.macd_hist); macdChart.addLineSeries({color:'#38bdf8',lineWidth:2}).setData(ch.macd); macdChart.addLineSeries({color:'#fb923c',lineWidth:1.5}).setData(ch.macd_signal);
   } else mw.classList.add('hidden');
 
-  const csAll=[mainChart,rsiChart,macdChart].filter(Boolean);
+  const csAll=[mainChart,heatChart,rsiChart,macdChart].filter(Boolean);
   csAll.forEach(c=>c.timeScale().subscribeVisibleLogicalRangeChange(r=>{if(r)csAll.forEach(o=>{if(o!==c)o.timeScale().setVisibleLogicalRange(r);});}));
   mainChart.timeScale().fitContent();
 }
@@ -168,7 +181,7 @@ async function liveSearch(){
   if(!q){l.classList.add('hidden');return;}
   searchTimer=setTimeout(async()=>{ try{ const d=await safeJson(`/api/search?q=${encodeURIComponent(q)}&brs_key=${encodeURIComponent(getBrs())}`); l.innerHTML=''; if(!d.results.length){l.classList.add('hidden');return;} d.results.forEach(r=>{ const dv=document.createElement('div'); dv.className='px-3 py-2 hover:bg-slate-800 cursor-pointer flex justify-between text-xs border-b border-slate-800/50'; dv.innerHTML=`<span><b>${r.symbol}</b> <span class="text-slate-400">${r.name}</span></span><span class="text-emerald-400">${fmt(r.today)} ${r.unit}</span>`; dv.onclick=()=>pickSymbol(r.symbol,r.market); l.appendChild(dv); }); l.classList.remove('hidden'); }catch(e){} }, 100);
 }
-function pickSymbol(s,m){ document.getElementById('search-box').value=s; document.getElementById('mkt-select').value=m; document.getElementById('autocomplete-list').classList.add('hidden'); runAnalyze(); }
+function pickSymbol(s,m){ document.getElementById('search-box').value=s; document.getElementById('mkt-select').value=m; document.getElementById('autocomplete-list').classList.add('hidden'); runAnalyze(); window.scrollTo({top:0,behavior:'smooth'}); }
 
 async function runAnalyze(){
   document.getElementById('autocomplete-list').classList.add('hidden');
@@ -178,14 +191,27 @@ async function runAnalyze(){
     if(!d.found||d.no_candles){ document.getElementById('speed-bar').innerHTML=`<span class="text-rose-400">${d.found?d.candle_source:'نماد یافت نشد'}</span>`; return; }
     lastPayload=d;
     document.getElementById('speed-bar').innerHTML=`<span><b>${d.symbol} (${d.display_name})</b> | قیمت: <b>${fmt(d.price)} ${d.unit}</b> | ${d.bars_count} کندل</span><span class="text-emerald-400">${d.elapsed_ms}ms</span>`;
-    document.getElementById('coherence-banner').innerHTML=`<div class="font-bold text-sm text-emerald-300">🧭 ${d.coherence.verdict} (امتیاز: ${d.coherence.score})</div>` + d.coherence.conflicts.map(c=>`<div class="text-slate-300">• ${c}</div>`).join('');
-    document.getElementById('div-card').innerHTML=`<div class="font-bold text-amber-400">🔀 واگرایی (RSI):</div>` + (d.divergences.found ? d.divergences.items.map(x=>`<div class="font-bold">${x.title}</div><div class="text-slate-300">${x.desc}</div>`).join('') : `<div class="text-slate-400">${d.divergences.summary}</div>`);
-    document.getElementById('cs-card').innerHTML=`<div class="font-bold text-sky-400">🕯️ کندل‌شناسی (تریدینگ‌ویو): ${d.candlesticks.bias_fa}</div>` + d.candlesticks.patterns.map(p=>`<div><b>${p.name}</b>: <span class="text-slate-300">${p.desc}</span></div>`).join('');
+    document.getElementById('coherence-banner').innerHTML=`<div class="font-bold text-sm text-emerald-300">🧭 ${d.coherence.verdict} (امتیاز: ${d.coherence.score})</div>`+d.coherence.conflicts.map(c=>`<div class="text-slate-300">• ${c}</div>`).join('');
+    document.getElementById('harm-card').innerHTML=`<div class="font-bold text-fuchsia-400">🦋 الگوی هارمونیک:</div>`+(d.harmonics.available?`<div class="font-bold text-fuchsia-200">${d.harmonics.name}</div><div class="text-slate-400 text-[11px]">${d.harmonics.ratios} | PRZ: ${fmt(d.harmonics.prz)}</div>`:`<div class="text-slate-400">${d.harmonics.name}</div>`);
+    document.getElementById('div-card').innerHTML=`<div class="font-bold text-amber-400">🔀 واگرایی (RSI):</div>`+(d.divergences.found?d.divergences.items.map(x=>`<div class="font-bold">${x.title}</div><div class="text-slate-300">${x.desc}</div>`).join(''):`<div class="text-slate-400">${d.divergences.summary}</div>`);
+    document.getElementById('cs-card').innerHTML=`<div class="font-bold text-sky-400">🕯️ کندل‌شناسی: ${d.candlesticks.bias_fa}</div>`+d.candlesticks.patterns.map(p=>`<div><b>${p.name}</b>: <span class="text-slate-300">${p.desc}</span></div>`).join('');
     document.getElementById('sm-card').innerHTML=`<div class="font-bold text-emerald-400">💰 پول هوشمند: ${d.smart_money.verdict}</div><div class="text-slate-300">${d.smart_money.detail}</div>`;
     renderTradingCharts(d.chart); renderHorizons(d);
     document.getElementById('bt-banner').innerHTML=d.backtest.sufficient?`<b class="text-sky-400">📊 ${d.backtest.summary}</b>`:`<span class="text-slate-400">${d.backtest.reason}</span>`;
     document.getElementById('strat-info').innerHTML=`<div>🔹 ${d.strategies.past}</div><div class="text-emerald-300">🔸 ${d.strategies.present}</div><div class="text-sky-300">🔺 ${d.strategies.future}</div>`;
   }catch(e){ document.getElementById('speed-bar').innerHTML=e.message; }
+}
+
+async function loadHeatmap(){
+  try{
+    const d=await safeJson(`/api/market-heatmap?brs_key=${encodeURIComponent(getBrs())}`);
+    const all=[...d.bourse, ...d.crypto];
+    document.getElementById('market-heatmap').innerHTML=all.map(x=>{
+      const p=x.change_pct||0;
+      const bg=p>=3?'bg-emerald-600':(p>0?'bg-emerald-800/80':(p<=-3?'bg-rose-600':(p<0?'bg-rose-900/80':'bg-slate-800')));
+      return `<div onclick="pickSymbol('${x.symbol}','${x.market}')" class="${bg} p-2 rounded-lg cursor-pointer hover:opacity-90 border border-white/10"><div class="font-bold truncate">${x.symbol}</div><div dir="ltr" class="text-[11px]">${p>0?'+':''}${p}%</div></div>`;
+    }).join('');
+  }catch(e){}
 }
 
 async function loadTop10(){ try{ const d=await safeJson(`/api/top10-scanner?brs_key=${encodeURIComponent(getBrs())}`); const nm={H1_DAILY:'۱) روزانه',H2_WEEKLY:'۲) هفتگی',H3_MONTHLY:'۳) ماهانه',H4_120D:'۴) ۱۲۰ روزه'}; document.getElementById('top10-grid').innerHTML=Object.keys(nm).map(k=>`<div class="bg-slate-900 border border-slate-800 rounded-xl p-3 space-y-1 text-xs"><div class="font-bold text-sky-400 border-b border-slate-800 pb-1">۱۰ برتر ${nm[k]}</div>${(d[k]||[]).map((x,i)=>`<div onclick="pickSymbol('${x.symbol}','${x.market}')" class="flex justify-between cursor-pointer hover:bg-slate-800 px-1 rounded"><span>${i+1}. <b>${x.symbol}</b> <span class="text-[10px] ${x.conf_num>=3?'text-amber-400':'text-slate-400'}">${x.conf_num>=3?'🔥':''}${x.confluence}</span></span><span class="text-emerald-400">+${x.net_return_pct}%</span></div>`).join('')||'<div class="text-slate-500">موردی یافت نشد</div>'}</div>`).join(''); }catch(e){} }
@@ -196,7 +222,7 @@ async function addPf(){ await safeJson('/api/portfolio',{method:'POST',headers:{
 async function delPf(id){ await safeJson(`/api/portfolio/${id}`,{method:'DELETE'}); loadPf(); }
 
 window.addEventListener('resize', ()=>{ if(lastPayload) renderTradingCharts(lastPayload.chart); });
-loadSys(); runAnalyze(); loadTop10(); loadWL(); loadPf();
+loadSys(); runAnalyze(); loadHeatmap(); loadTop10(); loadWL(); loadPf();
 </script>
 </body>
 </html>
